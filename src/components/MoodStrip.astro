@@ -1,0 +1,41 @@
+---
+import MoodFace from './MoodFace.astro';
+
+const moods = [
+  { id: 'radiant', label: 'radiant' },
+  { id: 'happy', label: 'happy' },
+  { id: 'calm', label: 'calm' },
+  { id: 'normal', label: 'normal' },
+  { id: 'down', label: 'down' },
+  { id: 'off', label: 'off' }
+] as const;
+---
+<section class="wrap strip-wrap">
+  <div class="strip">
+    <header class="strip__head">
+      <h2 class="strip__title">six moods. that is the whole vocabulary.</h2>
+      <p class="strip__note">no 1–10 sliders, no journaling homework.</p>
+    </header>
+    <ul class="strip__grid">
+      {moods.map((m) => (
+        <li class="strip__item">
+          <span class="strip__tile" style={`background: var(--lg-mood-${m.id})`}><MoodFace kind={m.id} size={52} /></span>
+          <span class="strip__label">{m.label}</span>
+        </li>
+      ))}
+    </ul>
+  </div>
+</section>
+
+<style>
+  .strip-wrap { margin-top: 34px; }
+  .strip { background: var(--lg-surface); border: 1px solid var(--lg-outline-variant); border-radius: var(--lg-radius-panel); padding: 26px 28px; }
+  .strip__head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .strip__title { font-size: 19px; }
+  .strip__note { margin: 0; font-size: 13.5px; color: var(--lg-on-surface-subtle); }
+  .strip__grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin: 20px 0 0; padding: 0; list-style: none; }
+  .strip__item { display: flex; flex-direction: column; align-items: center; gap: 9px; }
+  .strip__tile { width: 100%; aspect-ratio: 1; border-radius: 24px; display: flex; align-items: center; justify-content: center; }
+  .strip__label { font-family: var(--lg-font-display); font-weight: 700; font-size: 14px; }
+  @media (max-width: 720px) { .strip__grid { grid-template-columns: repeat(3, 1fr); } .strip { padding: 20px; } }
+</style>

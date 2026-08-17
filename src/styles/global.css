@@ -1,0 +1,125 @@
+/* loggoo design system tokens — see Loggoo Design System.dc.html */
+:root {
+  --lg-background: #FBF6F0;
+  --lg-surface: #FFFFFF;
+  --lg-surface-dim: #F1E9DF;
+  --lg-surface-variant: #F3EAE0;
+  --lg-surface-container: #FDF3E7;
+  --lg-surface-inverse: #241C16;
+
+  --lg-on-background: #4A3728;
+  --lg-on-surface-variant: #6B5748;
+  --lg-on-surface-subtle: #A08D79;
+  --lg-on-surface-muted: #B7A491;
+
+  --lg-primary: #F6B393;
+  --lg-primary-hover: #F0A87F;
+  --lg-on-primary: #5B3A22;
+  --lg-primary-container: #FBE7D6;
+  --lg-primary-container-dim: #FBDCC4;
+  --lg-primary-container-line: #F4D6BE;
+  --lg-on-primary-container: #B25E33;
+  --lg-secondary: #E8804F;
+
+  --lg-mood-radiant: #F6E3A3;
+  --lg-mood-happy: #9BD9B8;
+  --lg-mood-calm: #A9D6EE;
+  --lg-mood-normal: #E8DCCC;
+  --lg-mood-down: #F3C3CB;
+  --lg-mood-off: #F8B79A;
+  --lg-on-mood: #2E2018;
+
+  --lg-outline-variant: #F1E7DB;
+  --lg-outline: #E7D9C9;
+  --lg-outline-row: #F5EDE4;
+  --lg-outline-rail: #EDE2D6;
+
+  --lg-font-display: Quicksand, ui-rounded, system-ui, sans-serif;
+  --lg-font-body: Nunito, system-ui, -apple-system, sans-serif;
+
+  --lg-radius-card: 26px;
+  --lg-radius-tile: 20px;
+  --lg-radius-panel: 30px;
+
+  --lg-gutter: 26px;
+  --lg-max: 1180px;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  background: var(--lg-background);
+  color: var(--lg-on-background);
+  font-family: var(--lg-font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+h1, h2, h3 { font-family: var(--lg-font-display); font-weight: 700; margin: 0; }
+
+a { color: var(--lg-on-primary-container); text-decoration: none; }
+a:hover { color: #8F4622; }
+
+img { display: block; max-width: 100%; height: auto; }
+
+:focus-visible { outline: 2.5px solid var(--lg-primary-hover); outline-offset: 3px; border-radius: 8px; }
+
+.wrap { max-width: var(--lg-max); margin: 0 auto; padding: 0 var(--lg-gutter); }
+.section { padding-top: 84px; }
+.eyebrow { font-size: 12.5px; font-weight: 700; letter-spacing: .7px; color: var(--lg-on-surface-muted); }
+.h2 { font-size: clamp(28px, 3.2vw, 40px); letter-spacing: -1.1px; line-height: 1.12; }
+.lead { font-size: 16px; line-height: 1.6; color: var(--lg-on-surface-variant); text-wrap: pretty; }
+.card {
+  background: var(--lg-surface);
+  border: 1px solid var(--lg-outline-variant);
+  border-radius: var(--lg-radius-card);
+  padding: 22px;
+}
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  padding: 15px 24px; border-radius: 22px;
+  font-family: var(--lg-font-display); font-weight: 700; font-size: 16px;
+  transition: background .16s ease, transform .16s ease;
+}
+.btn--primary { background: var(--lg-primary); color: var(--lg-on-primary); }
+.btn--primary:hover { background: var(--lg-primary-hover); color: var(--lg-on-primary); transform: translateY(-1px); }
+.btn--ghost { background: var(--lg-surface); border: 1px solid var(--lg-outline); color: var(--lg-on-background); }
+.btn--ghost:hover { background: var(--lg-surface-variant); color: var(--lg-on-background); }
+.btn--sm { padding: 9px 15px; border-radius: 16px; font-size: 13.5px; gap: 7px; }
+
+.mood-face { display: block; }
+
+@media (max-width: 640px) {
+  :root { --lg-gutter: 18px; }
+  .section { padding-top: 62px; }
+}
+
+/* motion — reveal state lives in Base.astro (single selector list, needed pre-paint) */
+@keyframes lg-glow { 0%, 100% { transform: scale(1); opacity: .88; } 50% { transform: scale(1.07); opacity: 1; } }
+@keyframes lg-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
+@keyframes lg-flicker { 0%, 100% { transform: scale(1) rotate(0deg); } 35% { transform: scale(1.13) rotate(-4deg); } 70% { transform: scale(.95) rotate(3deg); } }
+@keyframes lg-fade-up { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+
+.hero__glow { animation: lg-glow 7s ease-in-out infinite; }
+.hero__chip--mood { animation: lg-float 6s ease-in-out infinite; }
+.hero__chip--streak { animation: lg-float 7.5s ease-in-out infinite reverse; }
+.hero__chip--streak svg, .streaks__banner > svg { animation: lg-flicker 2.6s ease-in-out infinite; transform-origin: 50% 80%; }
+
+.card { transition: transform .22s ease, box-shadow .22s ease; }
+.card:hover { transform: translateY(-3px); box-shadow: 0 18px 30px -22px rgba(74, 55, 40, .45); }
+.strip__tile, .cta__faces span { transition: transform .22s ease; }
+.strip__item:hover .strip__tile, .cta__faces span:hover { transform: translateY(-4px) scale(1.05); }
+.screens__item img { transition: transform .3s ease; }
+.screens__item:hover img { transform: translateY(-6px); }
+.faq__item[open] p { animation: lg-fade-up .26s ease both; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  * { animation: none !important; transition: none !important; }
+}

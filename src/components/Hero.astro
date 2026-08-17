@@ -1,0 +1,77 @@
+---
+import { site } from '../data/site';
+import MoodFace from './MoodFace.astro';
+import StoreIcons from './StoreIcons.astro';
+import Flame from './Flame.astro';
+---
+<section class="hero wrap">
+  <div class="hero__copy">
+    <p class="hero__badge"><Flame size={14} />one small ritual, every night</p>
+    <h1 class="hero__title">a whole day,<br />on one timeline.</h1>
+    <p class="hero__lead">{site.description}</p>
+    <div class="hero__buttons">
+      <a class="btn btn--primary" href={site.appStore}><StoreIcons store="ios" />download for ios</a>
+      <a class="btn btn--ghost" href={site.playStore}><StoreIcons store="android" />get it on android</a>
+    </div>
+    <ul class="hero__trust">
+      <li>free to log</li>
+      <li>no account needed</li>
+      <li>photos stay on your phone</li>
+    </ul>
+  </div>
+
+  <div class="hero__shot">
+    <div class="hero__glow" aria-hidden="true"></div>
+    <img src="/screens/timeline.png" width="298" alt="loggoo showing today's timeline with a photo, a caption and a logged mood" />
+    <div class="hero__chip hero__chip--mood">
+      <span class="hero__tile" style="background: var(--lg-mood-radiant)"><MoodFace kind="radiant" size={26} /></span>
+      <span><strong>radiant</strong><em>logged in two taps</em></span>
+    </div>
+    <div class="hero__chip hero__chip--streak"><Flame size={17} color="var(--lg-primary)" />12 day streak</div>
+  </div>
+</section>
+
+<style>
+  .hero { padding-top: 66px; display: grid; grid-template-columns: 1.06fr .94fr; gap: 44px; align-items: center; }
+  .hero__badge {
+    display: inline-flex; align-items: center; gap: 8px; margin: 0;
+    padding: 7px 14px; border-radius: 16px;
+    background: var(--lg-primary-container); border: 1px solid var(--lg-primary-container-line);
+    font-size: 12.5px; font-weight: 700; color: var(--lg-on-primary-container);
+  }
+  .hero__title { font-size: clamp(38px, 4.6vw, 62px); line-height: 1.03; letter-spacing: -2px; margin: 18px 0 0; text-wrap: balance; }
+  .hero__lead { font-size: 17.5px; line-height: 1.65; color: var(--lg-on-surface-variant); margin: 20px 0 0; max-width: 490px; text-wrap: pretty; }
+  .hero__buttons { display: flex; gap: 11px; margin-top: 28px; flex-wrap: wrap; }
+  .hero__trust { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin: 22px 0 0; padding: 0; list-style: none; font-size: 13px; font-weight: 600; color: var(--lg-on-surface-subtle); }
+  .hero__trust li + li::before { content: ''; display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: #DCCBB8; margin-right: 18px; vertical-align: middle; }
+
+  .hero__shot { position: relative; display: flex; justify-content: center; align-items: flex-end; min-height: 560px; }
+  .hero__glow { position: absolute; top: 24px; width: 420px; height: 420px; border-radius: 50%; background: radial-gradient(circle, rgba(246,179,147,.42), rgba(246,179,147,0) 68%); }
+  .hero__shot img { position: relative; width: 298px; filter: drop-shadow(0 40px 60px rgba(74,55,40,.24)); }
+  .hero__chip {
+    position: absolute; display: flex; align-items: center; gap: 10px;
+    background: var(--lg-surface); border: 1px solid var(--lg-outline-variant);
+    border-radius: var(--lg-radius-tile); padding: 11px 15px;
+    box-shadow: 0 20px 34px -22px rgba(74,55,40,.5);
+  }
+  .hero__chip--mood { left: 0; bottom: 96px; }
+  .hero__chip--mood strong { display: block; font-family: var(--lg-font-display); font-size: 14px; }
+  .hero__chip--mood em { display: block; font-style: normal; font-size: 11.5px; color: var(--lg-on-surface-subtle); }
+  .hero__tile { width: 38px; height: 38px; border-radius: 13px; display: flex; align-items: center; justify-content: center; flex: none; }
+  .hero__chip--streak {
+    right: 0; top: 78px; background: var(--lg-surface-inverse); border-color: transparent;
+    font-family: var(--lg-font-display); font-weight: 700; font-size: 13.5px; color: var(--lg-background);
+  }
+
+  @media (max-width: 980px) {
+    .hero { grid-template-columns: 1fr; gap: 20px; padding-top: 48px; }
+    .hero__shot { min-height: 480px; }
+    .hero__chip--mood { left: 4%; }
+    .hero__chip--streak { right: 4%; }
+  }
+  @media (max-width: 560px) {
+    .hero__shot img { width: 240px; }
+    .hero__glow { width: 300px; height: 300px; }
+    .hero__chip--mood { bottom: 40px; left: 0; }
+  }
+</style>

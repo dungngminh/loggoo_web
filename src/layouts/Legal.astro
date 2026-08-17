@@ -1,0 +1,41 @@
+---
+import Base from './Base.astro';
+
+interface Props { title: string; updated: string; meta?: string; description?: string; }
+const { title, updated, meta, description } = Astro.props;
+---
+<Base title={title} description={description}>
+  <article class="legal wrap">
+    <a class="legal__back" href="/">← back to loggoo</a>
+    <h1 class="legal__title">{title}</h1>
+    <p class="legal__meta"><span>last updated · {updated}</span>{meta && <span>{meta}</span>}</p>
+    <slot />
+  </article>
+</Base>
+
+<style is:global>
+  .legal { padding-top: 52px; max-width: 812px; }
+  .legal__back { font-size: 13.5px; font-weight: 700; }
+  .legal__title { font-size: clamp(30px, 3.6vw, 44px); letter-spacing: -1.4px; line-height: 1.1; margin: 18px 0 0; }
+  .legal__meta { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13.5px; color: var(--lg-on-surface-subtle); margin: 10px 0 0; }
+  .legal h2 { font-size: 20px; margin: 30px 0 0; }
+  .legal p { font-size: 15.5px; line-height: 1.75; margin: 10px 0 0; text-wrap: pretty; }
+  .legal__intro {
+    margin-top: 22px; padding: 20px 22px; border-radius: 24px;
+    background: var(--lg-surface-container); border: 1px solid #F2E3CF;
+    font-size: 15px; line-height: 1.7; color: var(--lg-on-surface-variant);
+  }
+  .legal__panel { margin-top: 22px; padding: 24px 26px; border-radius: var(--lg-radius-card); background: var(--lg-surface); border: 1px solid var(--lg-outline-variant); }
+  .legal__panel h2 { font-size: 17px; margin: 0; }
+  .legal__checks { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 11px; }
+  .legal__checks li { display: flex; gap: 11px; align-items: flex-start; font-size: 15px; line-height: 1.6; }
+  .legal__checks li::before {
+    content: '✓'; flex: none; width: 22px; height: 22px; border-radius: 8px;
+    background: #E4F1E7; color: #4C8A63; font-weight: 700; font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .legal__items { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .legal__items li { padding: 13px 15px; border-radius: 18px; background: var(--lg-surface); border: 1px solid var(--lg-outline-variant); font-size: 14.5px; line-height: 1.6; }
+  .legal__contact { margin: 34px 0 0; padding: 22px 24px; border-radius: 24px; background: var(--lg-surface-container); border: 1px solid #F2E3CF; }
+  .legal__contact h2 { font-size: 17px; margin: 0; }
+</style>

@@ -1,0 +1,41 @@
+---
+import { site } from '../data/site';
+---
+<section class="section wrap about" id="about">
+  <div class="card about__story">
+    <p class="eyebrow">ABOUT</p>
+    <h2 class="about__title">made by {site.studio}</h2>
+    <p>we are a small independent studio building calm, single-purpose apps. loggoo started as a private habit — one photo and one mood a day — and grew into the app we wanted to exist: no feed to perform for, no streak that shames you, no data business behind the scenes.</p>
+    <p>we read every email. if loggoo is missing the one thing that would make it yours, tell us.</p>
+  </div>
+  <div class="about__contact">
+    <p class="eyebrow about__eyebrow">CONTACT</p>
+    <h2 class="about__hello">say hello</h2>
+    <p class="about__sub">support, bug reports, press, or a feature you keep wishing for.</p>
+    <a class="about__mail" href={`mailto:${site.email}`}>{site.email}</a>
+    <p class="about__reply">we usually reply within two days.</p>
+  </div>
+</section>
+
+<style>
+  .about { display: grid; grid-template-columns: 1.15fr .85fr; gap: 16px; }
+  .about__story { border-radius: var(--lg-radius-panel); padding: 30px 32px; }
+  .about__title { font-size: clamp(24px, 2.6vw, 32px); letter-spacing: -.9px; margin-top: 12px; }
+  .about__story p { font-size: 15.5px; line-height: 1.7; color: var(--lg-on-surface-variant); margin: 14px 0 0; text-wrap: pretty; }
+  .about__contact {
+    background: linear-gradient(150deg, #FBE3D2, #F8EDDF);
+    border: 1px solid #F2D9C3; border-radius: var(--lg-radius-panel);
+    padding: 30px 32px; display: flex; flex-direction: column;
+  }
+  .about__eyebrow { color: var(--lg-on-primary-container); }
+  .about__hello { font-size: 22px; letter-spacing: -.6px; margin-top: 12px; }
+  .about__sub { font-size: 14.5px; line-height: 1.65; color: #8A6446; margin: 8px 0 0; }
+  .about__mail {
+    margin-top: auto; padding: 14px 18px; border-radius: var(--lg-radius-tile);
+    background: var(--lg-surface); color: var(--lg-on-background); text-align: center;
+    font-family: var(--lg-font-display); font-weight: 700; font-size: 14.5px;
+  }
+  .about__mail:hover { background: #FDF8F2; color: var(--lg-on-background); }
+  .about__reply { font-size: 12.5px; color: #A2795A; text-align: center; margin: 9px 0 0; }
+  @media (max-width: 900px) { .about { grid-template-columns: 1fr; } }
+</style>

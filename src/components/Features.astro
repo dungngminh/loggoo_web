@@ -1,0 +1,216 @@
+---
+import MoodFace from './MoodFace.astro';
+
+const templates = [
+  { id: 'collage', label: 'collage', fill: 'linear-gradient(150deg,#FBD5A5,#EE9F79)', slot: 'rgba(255,255,255,.55)', picked: true },
+  { id: 'polaroid', label: 'polaroid', fill: 'linear-gradient(150deg,#FDF6EC,#E7D6C2)', slot: 'rgba(255,255,255,.75)' },
+  { id: 'hero', label: 'hero', fill: 'linear-gradient(150deg,#BFE3F2,#7FA8CE)', slot: 'rgba(255,255,255,.55)' },
+  { id: 'diary', label: 'diary', fill: 'repeating-linear-gradient(#FDF8EF 0 7px,#EFE2D0 7px 8px)', slot: 'rgba(255,255,255,.8)' },
+  { id: 'film', label: 'film', fill: 'linear-gradient(150deg,#4A3A2E,#211913)', slot: 'rgba(255,255,255,.32)' }
+];
+
+const pickerMoods = ['radiant', 'happy', 'calm', 'down', 'off'] as const;
+---
+<section class="section wrap" id="features">
+  <div class="features__head">
+    <p class="eyebrow">WHAT IT DOES</p>
+    <h2 class="h2">small enough to actually keep doing.</h2>
+    <p class="lead">loggoo is a camera, a mood tap and a one-line note, stitched into a day you can look back at.</p>
+  </div>
+
+  <div class="features__grid">
+    <article class="card">
+      <div class="mini mini--rail">
+        <div class="mini__rail"><span>07:20</span><i></i><b></b></div>
+        <div class="mini__stack"><div class="mini__photo"></div><div class="mini__note"></div></div>
+      </div>
+      <h3 class="card__title">one timeline for today</h3>
+      <p class="card__body">photos, moods and notes land in time order — the day reads like a day, not a grid of files.</p>
+    </article>
+
+    <article class="card">
+      <div class="mini mini--moods">
+        {pickerMoods.map((m) => (
+          <span class={m === 'calm' ? 'is-picked' : ''} style={`background: var(--lg-mood-${m})`}>
+            <MoodFace kind={m} size={30} />
+          </span>
+        ))}
+      </div>
+      <h3 class="card__title">a mood is one tap</h3>
+      <p class="card__body">radiant to off. log it as often as the day changes — mornings and midnights can disagree.</p>
+    </article>
+
+    <article class="card">
+      <div class="mini mini--templates">
+        {templates.map((t) => (
+          <span class="tpl">
+            <i class={t.picked ? 'tpl__thumb is-picked' : 'tpl__thumb'} style={`background: ${t.fill}`}>
+              <b style={`background: ${t.slot}`}></b>
+            </i>
+            <em class={t.picked ? 'tpl__label is-picked' : 'tpl__label'}>{t.label}</em>
+          </span>
+        ))}
+      </div>
+      <h3 class="card__title">frame your day</h3>
+      <p class="card__body">seven templates, 9:16 or 4:5. one tap turns today's photos and moods into a picture ready for stories.</p>
+    </article>
+
+    <article class="card">
+      <div class="mini mini--cal">
+        <span class="cal-empty"></span>
+        <span class="cal-day"><i style="background: var(--lg-mood-happy)"><MoodFace kind="happy" size={16} /></i></span>
+        <span class="cal-day"><i style="background: var(--lg-mood-calm)"><MoodFace kind="calm" size={16} /></i></span>
+        <span class="cal-chain cal-chain--l"></span>
+        <span class="cal-chain"></span>
+        <span class="cal-chain"></span>
+        <span class="cal-chain cal-chain--r"><i style="background: var(--lg-mood-radiant)"><MoodFace kind="radiant" size={16} /></i></span>
+      </div>
+      <h3 class="card__title">a month you can read</h3>
+      <p class="card__body">every day wears its average mood, and the streak chain shows where you kept the habit.</p>
+    </article>
+
+    <article class="card">
+      <div class="mini mini--bars">
+        <span style="height:52%; background: var(--lg-mood-calm)"></span>
+        <span style="height:78%; background: var(--lg-mood-happy)"></span>
+        <span style="height:64%; background: var(--lg-mood-calm)"></span>
+        <span style="height:100%; background: var(--lg-mood-radiant)"></span>
+        <span style="height:40%; background: var(--lg-mood-down)"></span>
+        <span style="height:78%; background: var(--lg-mood-happy)"></span>
+        <span style="height:88%; background: var(--lg-mood-happy)"></span>
+      </div>
+      <h3 class="card__title">trends, without the lecture</h3>
+      <p class="card__body">weekly averages, your best days and gentle observations — never a score to beat.</p>
+    </article>
+
+    <article class="card">
+      <div class="mini mini--lock">
+        <span class="mini__lock">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#7A6252" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="4" y="10" width="16" height="10" rx="3"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path>
+          </svg>
+        </span>
+        <span class="mini__lines"><i style="width:78%"></i><i style="width:56%"></i><i style="width:66%"></i></span>
+      </div>
+      <h3 class="card__title">private unless you say so</h3>
+      <p class="card__body">no account, no feed, no ads. your photos and notes live on your phone; cloud backup is opt-in.</p>
+    </article>
+  </div>
+</section>
+
+<style>
+  .features__head { max-width: 620px; }
+  .features__head .h2 { margin-top: 12px; }
+  .features__head .lead { margin-top: 14px; }
+  .features__grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 34px; }
+  .card__title { font-size: 17px; margin-top: 16px; }
+  .card__body { font-size: 14px; line-height: 1.6; color: var(--lg-on-surface-variant); margin: 7px 0 0; text-wrap: pretty; }
+
+  .mini { height: 76px; }
+  .mini--rail { display: flex; gap: 12px; }
+  .mini__rail { width: 44px; flex: none; display: flex; flex-direction: column; align-items: center; }
+  .mini__rail span { font-family: var(--lg-font-display); font-weight: 700; font-size: 11.5px; color: #A8927C; }
+  .mini__rail i { width: 8px; height: 8px; border-radius: 50%; background: var(--lg-mood-calm); margin-top: 6px; }
+  .mini__rail b { flex: 1; width: 2px; background: var(--lg-outline-rail); }
+  .mini__stack { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+  .mini__photo { height: 40px; border-radius: 16px; background: radial-gradient(circle at 30% 25%, rgba(255,255,255,.5), transparent 55%), linear-gradient(160deg,#FBD5A5,#EE9F79); }
+  .mini__note { height: 28px; border-radius: 14px; background: var(--lg-surface-container); border: 1px solid #F2E3CF; }
+
+  .mini--moods { display: flex; gap: 8px; align-items: center; }
+  .mini--moods span { flex: 1; aspect-ratio: 1; border-radius: 16px; max-height: 100%; display: flex; align-items: center; justify-content: center; }
+  .mini--moods .is-picked { box-shadow: 0 0 0 2.5px var(--lg-primary-hover); }
+
+  .mini--templates { display: flex; gap: 9px; align-items: flex-start; }
+  .tpl { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+  .tpl__thumb { width: 40px; height: 58px; border-radius: 12px; display: flex; align-items: flex-end; padding: 5px; }
+  .tpl__thumb.is-picked { box-shadow: 0 0 0 2.5px var(--lg-primary-hover); }
+  .tpl__thumb b { width: 100%; height: 32%; border-radius: 5px; }
+  .tpl__label { font-style: normal; font-size: 9.5px; font-weight: 700; color: #A8927C; }
+  .tpl__label.is-picked { color: var(--lg-on-background); }
+
+  .mini--cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; align-items: center; }
+  .mini--cal span { aspect-ratio: .78; border-radius: 11px; display: flex; align-items: center; justify-content: center; }
+  .cal-empty { background: var(--lg-outline-row); }
+  .cal-day { background: var(--lg-surface); border: 1px solid var(--lg-outline-variant); }
+  .mini--cal i { width: 20px; height: 20px; border-radius: 7px; display: flex; align-items: center; justify-content: center; }
+  .cal-chain { background: var(--lg-primary-container-dim); border-radius: 3px !important; }
+  .cal-chain--l { border-radius: 11px 3px 3px 11px !important; }
+  .cal-chain--r { border-radius: 3px 11px 11px 3px !important; box-shadow: 0 0 0 2.5px var(--lg-primary-hover); }
+
+  .mini--bars { display: flex; align-items: flex-end; gap: 6px; }
+  .mini--bars span { flex: 1; border-radius: 9px; }
+
+  .mini--lock { display: flex; align-items: center; gap: 10px; }
+  .mini__lock { width: 56px; height: 56px; border-radius: var(--lg-radius-tile); background: var(--lg-surface-variant); display: flex; align-items: center; justify-content: center; flex: none; }
+  .mini__lines { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+  .mini__lines i { height: 9px; border-radius: 5px; background: var(--lg-surface-variant); }
+
+  @media (max-width: 980px) { .features__grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 640px) { .features__grid { grid-template-columns: 1fr; } }
+
+  /* mini illustrations draw themselves when the card is revealed (.is-in from Base.astro).
+     start states live only inside the keyframes, so reduced motion leaves everything visible. */
+  @keyframes mini-pop { from { opacity: 0; transform: scale(.62); } to { opacity: 1; transform: none; } }
+  @keyframes mini-slide { from { opacity: 0; transform: translateX(-14px); } to { opacity: 1; transform: none; } }
+  @keyframes mini-grow-y { from { transform: scaleY(.04); } to { transform: scaleY(1); } }
+  @keyframes mini-grow-x { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+  @keyframes mini-drop { from { opacity: 0; transform: translateY(-14px); } to { opacity: 1; transform: none; } }
+
+  /* fill-mode backwards, not both: once the animation ends the element falls back to its
+     normal CSS, so :hover transforms below are not blocked by a held final keyframe. */
+
+  /* 1 · timeline rail */
+  .card.is-in .mini__rail span { animation: mini-drop .4s .1s backwards; }
+  .card.is-in .mini__rail i { animation: mini-pop .4s .22s backwards; }
+  .card.is-in .mini__rail b { transform-origin: top; animation: mini-grow-y .5s .3s backwards; }
+  .card.is-in .mini__photo { animation: mini-slide .45s .34s backwards; }
+  .card.is-in .mini__note { animation: mini-slide .45s .44s backwards; }
+
+  /* 2 · moods */
+  .card.is-in .mini--moods span { animation: mini-pop .42s backwards; }
+  .card.is-in .mini--moods span:nth-child(1) { animation-delay: .08s; }
+  .card.is-in .mini--moods span:nth-child(2) { animation-delay: .14s; }
+  .card.is-in .mini--moods span:nth-child(3) { animation-delay: .2s; }
+  .card.is-in .mini--moods span:nth-child(4) { animation-delay: .26s; }
+  .card.is-in .mini--moods span:nth-child(5) { animation-delay: .32s; }
+  .mini--moods span { transition: transform .2s ease; }
+  .mini--moods span:hover { transform: translateY(-4px) scale(1.06); }
+
+  /* 3 · templates */
+  .card.is-in .tpl { animation: mini-drop .42s backwards; }
+  .card.is-in .tpl:nth-child(1) { animation-delay: .08s; }
+  .card.is-in .tpl:nth-child(2) { animation-delay: .15s; }
+  .card.is-in .tpl:nth-child(3) { animation-delay: .22s; }
+  .card.is-in .tpl:nth-child(4) { animation-delay: .29s; }
+  .card.is-in .tpl:nth-child(5) { animation-delay: .36s; }
+  .tpl__thumb { transition: transform .2s ease; }
+  .tpl:hover .tpl__thumb { transform: translateY(-5px); }
+
+  /* 4 · month + streak chain */
+  .card.is-in .cal-empty, .card.is-in .cal-day { animation: mini-pop .4s backwards; }
+  .card.is-in .cal-day:nth-child(2) { animation-delay: .14s; }
+  .card.is-in .cal-day:nth-child(3) { animation-delay: .2s; }
+  .card.is-in .cal-chain { transform-origin: left center; animation: mini-grow-x .34s backwards; }
+  .card.is-in .cal-chain:nth-child(4) { animation-delay: .3s; }
+  .card.is-in .cal-chain:nth-child(5) { animation-delay: .4s; }
+  .card.is-in .cal-chain:nth-child(6) { animation-delay: .5s; }
+  .card.is-in .cal-chain--r { animation-delay: .6s; }
+  .card.is-in .cal-chain--r i { animation: mini-pop .38s .78s backwards; }
+
+  /* 5 · bars */
+  .card.is-in .mini--bars span { transform-origin: bottom; animation: mini-grow-y .5s backwards; }
+  .card.is-in .mini--bars span:nth-child(1) { animation-delay: .08s; }
+  .card.is-in .mini--bars span:nth-child(2) { animation-delay: .14s; }
+  .card.is-in .mini--bars span:nth-child(3) { animation-delay: .2s; }
+  .card.is-in .mini--bars span:nth-child(4) { animation-delay: .26s; }
+  .card.is-in .mini--bars span:nth-child(5) { animation-delay: .32s; }
+  .card.is-in .mini--bars span:nth-child(6) { animation-delay: .38s; }
+  .card.is-in .mini--bars span:nth-child(7) { animation-delay: .44s; }
+
+  /* 6 · privacy */
+  .card.is-in .mini__lock { animation: mini-pop .44s .1s backwards; }
+  .card.is-in .mini__lines i { transform-origin: left center; animation: mini-grow-x .4s backwards; }
+  .card.is-in .mini__lines i:nth-child(1) { animation-delay: .24s; }
+  .card.is-in .mini__lines i:nth-child(2) { animation-delay: .32s; }
+  .card.is-in .mini__lines i:nth-child(3) { animation-delay: .4s; }
+</style>

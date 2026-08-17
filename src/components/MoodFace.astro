@@ -1,0 +1,53 @@
+---
+interface Props { kind: 'radiant' | 'happy' | 'calm' | 'normal' | 'down' | 'off'; size?: number; }
+const { kind, size = 52 } = Astro.props;
+const ink = 'var(--lg-on-mood, #2E2018)';
+const s = { stroke: ink, 'stroke-width': '3.6', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', fill: 'none' };
+---
+<svg class="mood-face" width={size} height={size} viewBox="0 0 48 48" fill="none" aria-hidden="true">
+  {kind === 'radiant' && (
+    <g>
+      <rect x="9" y="15" width="13" height="10" rx="3.4" fill={ink} />
+      <rect x="26" y="15" width="13" height="10" rx="3.4" fill={ink} />
+      <path d="M22 18h4" {...s} />
+      <path d="M17 32c4 4.4 11 3.4 14-1.6" {...s} />
+    </g>
+  )}
+  {kind === 'happy' && (
+    <g>
+      <path d="M13 20c1.6-2.6 4.6-2.6 6.2 0" {...s} />
+      <path d="M28.8 20c1.6-2.6 4.6-2.6 6.2 0" {...s} />
+      <path d="M15 27c3.2 5.4 14.8 5.4 18 0" {...s} />
+    </g>
+  )}
+  {kind === 'calm' && (
+    <g>
+      <circle cx="17" cy="19" r="3.1" fill={ink} />
+      <circle cx="31" cy="19" r="3.1" fill={ink} />
+      <path d="M14 28h20a10 10 0 0 1-20 0z" fill={ink} />
+    </g>
+  )}
+  {kind === 'normal' && (
+    <g>
+      <circle cx="17" cy="20" r="2.9" fill={ink} />
+      <circle cx="31" cy="20" r="2.9" fill={ink} />
+      <path d="M16 31h16" {...s} />
+    </g>
+  )}
+  {kind === 'down' && (
+    <g>
+      <path d="M13 17c1.8 1.4 4.4 2.4 6.4 2.6" {...s} />
+      <path d="M35 17c-1.8 1.4-4.4 2.4-6.4 2.6" {...s} />
+      <path d="M17 34c0-5 14-5 14 0-1.4 2.4-12.6 2.4-14 0z" fill={ink} />
+    </g>
+  )}
+  {kind === 'off' && (
+    <g>
+      <path d="M12 15l8 4" {...s} />
+      <path d="M36 15l-8 4" {...s} />
+      <circle cx="17" cy="24" r="2.8" fill={ink} />
+      <circle cx="31" cy="24" r="2.8" fill={ink} />
+      <path d="M16 34c3.2-4 12.8-4 16 0" {...s} />
+    </g>
+  )}
+</svg>

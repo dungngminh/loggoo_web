@@ -1,0 +1,82 @@
+---
+import '../styles/global.css';
+import { site } from '../data/site';
+import Nav from '../components/Nav.astro';
+import Footer from '../components/Footer.astro';
+
+interface Props { title?: string; description?: string; }
+const { title, description = site.description } = Astro.props;
+const pageTitle = title ? title + ' · ' + site.name : site.name + ' — ' + site.tagline;
+const canonical = new URL(Astro.url.pathname, site.url).toString();
+
+// elements revealed on scroll. one list, used by the pre-paint CSS below and the observer.
+const reveal = [
+  '.hero__copy > *', '.hero__shot',
+  '.strip', '.features__head', '.features__grid > .card',
+  '.screens__head', '.screens__item',
+  '.streaks__inner > *', '.t__title', '.t__card',
+  '.faq > *', '.about > *', '.cta',
+  '.legal > *'
+].join(',');
+---
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{pageTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="theme-color" content="#FBF6F0" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={new URL('/og.png', site.url).toString()} />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Nunito:ital,wght@0,400;0,600;0,700;1,400&display=swap"
+      rel="stylesheet"
+    />
+
+    <style is:global set:html={`
+      .lg-motion :is(${reveal}) { opacity: 0; transform: translateY(20px); }
+      .lg-motion :is(${reveal}).is-in {
+        opacity: 1; transform: none;
+        transition: opacity .6s ease, transform .6s cubic-bezier(.22,.7,.15,1);
+        transition-delay: var(--lg-delay, 0ms);
+      }
+    `}></style>
+    <script is:inline>
+      // ponytail: no .lg-motion class under reduced motion / no JS, so nothing ever hides
+      if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        document.documentElement.classList.add('lg-motion');
+      }
+    </script>
+  </head>
+  <body>
+    <Nav />
+    <main>
+      <slot />
+    </main>
+    <Footer />
+    <script is:inline define:vars={{ reveal }}>
+      if (document.documentElement.classList.contains('lg-motion')) {
+        const io = new IntersectionObserver((entries, obs) => {
+          // entries land batched per frame — stagger them in document order
+          entries.filter((e) => e.isIntersecting).forEach((e, i) => {
+            e.target.style.setProperty('--lg-delay', i * 70 + 'ms');
+            e.target.classList.add('is-in');
+            obs.unobserve(e.target);
+          });
+        }, { threshold: 0.08, rootMargin: '0px 0px -6% 0px' });
+        document.querySelectorAll(reveal).forEach((el) => io.observe(el));
+      }
+    </script>
+  </body>
+</html>

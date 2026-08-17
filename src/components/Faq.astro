@@ -1,0 +1,42 @@
+---
+import { site } from '../data/site';
+
+const faqs = [
+  { q: 'is loggoo free?', a: 'logging photos, moods and notes is free, forever. optional one-time purchases unlock extra mood face packs and frame templates — no subscription, no trial countdown.' },
+  { q: 'do i need an account?', a: 'no. open the app and start logging. there is no sign-up, no email, no profile for anyone to follow.' },
+  { q: 'where do my photos live?', a: 'on your device. if you switch on cloud backup, a copy goes to your own icloud or google drive account — we never hold your photos or notes on our servers.' },
+  { q: 'can i delete everything?', a: 'yes — settings → delete all data wipes every moment on the device, and deleting the app takes the rest with it.' },
+  { q: 'does loggoo post anything for me?', a: 'never. sharing a frame is always your tap, into the app you choose. loggoo has no feed, no followers and no public profile.' },
+  { q: 'ios and android?', a: 'both, with the same features. purchases are tied to the store you bought them from, so restore them on that platform.' }
+];
+---
+<section class="section wrap faq" id="faq">
+  <div>
+    <h2 class="h2">questions, answered plainly</h2>
+    <p class="lead faq__lead">anything else — write to us and a human replies.</p>
+    <a class="btn btn--ghost btn--sm faq__mail" href={`mailto:${site.email}`}>{site.email}</a>
+  </div>
+  <div class="faq__list">
+    {faqs.map((f) => (
+      <details class="faq__item">
+        <summary><span>{f.q}</span><i aria-hidden="true">+</i></summary>
+        <p>{f.a}</p>
+      </details>
+    ))}
+  </div>
+</section>
+
+<style>
+  .faq { display: grid; grid-template-columns: .82fr 1.18fr; gap: 44px; align-items: start; }
+  .faq__lead { margin-top: 14px; }
+  .faq__mail { margin-top: 16px; }
+  .faq__list { display: flex; flex-direction: column; gap: 10px; }
+  .faq__item { background: var(--lg-surface); border: 1px solid var(--lg-outline-variant); border-radius: 22px; padding: 18px 20px; }
+  .faq__item summary { display: flex; align-items: center; gap: 14px; cursor: pointer; list-style: none; font-family: var(--lg-font-display); font-weight: 700; font-size: 16px; }
+  .faq__item summary::-webkit-details-marker { display: none; }
+  .faq__item summary span { flex: 1; }
+  .faq__item summary i { flex: none; font-style: normal; font-size: 19px; color: var(--lg-on-primary-container); transition: transform .18s ease; }
+  .faq__item[open] summary i { transform: rotate(45deg); }
+  .faq__item p { margin: 12px 0 0; font-size: 14.5px; line-height: 1.65; color: var(--lg-on-surface-variant); text-wrap: pretty; }
+  @media (max-width: 900px) { .faq { grid-template-columns: 1fr; gap: 24px; } }
+</style>

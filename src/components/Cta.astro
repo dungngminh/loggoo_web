@@ -1,0 +1,32 @@
+---
+import { site } from '../data/site';
+import MoodFace from './MoodFace.astro';
+---
+<section class="section wrap">
+  <div class="cta">
+    <div class="cta__faces">
+      <span style="background: var(--lg-mood-radiant)"><MoodFace kind="radiant" size={30} /></span>
+      <span style="background: var(--lg-mood-happy)"><MoodFace kind="happy" size={30} /></span>
+      <span style="background: var(--lg-mood-calm)"><MoodFace kind="calm" size={30} /></span>
+    </div>
+    <h2 class="cta__title">today is already happening.</h2>
+    <p class="cta__lead">log one photo and one mood before you sleep. that is the whole commitment.</p>
+    <div class="cta__buttons">
+      <a class="btn btn--primary" href={site.appStore}>download for ios</a>
+      <a class="btn btn--ghost" href={site.playStore}>get it on android</a>
+    </div>
+  </div>
+</section>
+
+<style>
+  .cta {
+    border-radius: 34px; background: var(--lg-surface); border: 1px solid var(--lg-outline-variant);
+    padding: 52px 40px; display: flex; flex-direction: column; align-items: center; text-align: center;
+  }
+  .cta__faces { display: flex; gap: 9px; }
+  .cta__faces span { width: 44px; height: 44px; border-radius: 15px; display: flex; align-items: center; justify-content: center; }
+  .cta__title { font-size: clamp(30px, 3.6vw, 44px); letter-spacing: -1.4px; line-height: 1.08; margin: 22px 0 0; max-width: 620px; }
+  .cta__lead { font-size: 16.5px; line-height: 1.6; color: var(--lg-on-surface-variant); margin: 14px 0 0; max-width: 480px; }
+  .cta__buttons { display: flex; gap: 11px; margin-top: 26px; flex-wrap: wrap; justify-content: center; }
+  @media (max-width: 560px) { .cta { padding: 36px 22px; } }
+</style>

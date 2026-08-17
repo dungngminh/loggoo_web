@@ -1,0 +1,33 @@
+---
+const quotes = [
+  { text: 'i quit three journaling apps. this one survived because it never asked me to write a paragraph.', name: 'linh', meta: 'designer · 94 day streak', mood: 'happy' },
+  { text: 'the nightly frame is the whole thing for me. my group chat gets one picture instead of forty photos.', name: 'dat', meta: 'student · frames every night', mood: 'radiant' },
+  { text: 'looking back at a month of faces told me more about my job than any mood chart did.', name: 'mai', meta: 'nurse · 6 months in', mood: 'calm' }
+];
+---
+<section class="section wrap">
+  <h2 class="h2 t__title">what people keep telling us</h2>
+  <div class="t__grid">
+    {quotes.map((q) => (
+      <figure class="card t__card">
+        <blockquote class="t__quote">“{q.text}”</blockquote>
+        <figcaption class="t__who">
+          <span class="t__avatar" style={`background: var(--lg-mood-${q.mood})`}>{q.name.charAt(0)}</span>
+          <span><strong>{q.name}</strong><em>{q.meta}</em></span>
+        </figcaption>
+      </figure>
+    ))}
+  </div>
+</section>
+
+<style>
+  .t__title { max-width: 560px; }
+  .t__grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 30px; }
+  .t__card { display: flex; flex-direction: column; gap: 16px; padding: 24px; margin: 0; }
+  .t__quote { margin: 0; font-size: 15.5px; line-height: 1.65; font-style: italic; text-wrap: pretty; }
+  .t__who { display: flex; align-items: center; gap: 11px; margin-top: auto; }
+  .t__avatar { width: 38px; height: 38px; border-radius: 13px; display: flex; align-items: center; justify-content: center; font-family: var(--lg-font-display); font-weight: 700; font-size: 15px; color: var(--lg-on-mood); }
+  .t__who strong { display: block; font-family: var(--lg-font-display); font-size: 14px; }
+  .t__who em { display: block; font-style: normal; font-size: 12px; color: var(--lg-on-surface-subtle); }
+  @media (max-width: 860px) { .t__grid { grid-template-columns: 1fr; } }
+</style>

@@ -1,0 +1,119 @@
+---
+import Legal from '../layouts/Legal.astro';
+import { site } from '../data/site';
+---
+<Legal
+  title="terms of service"
+  updated={site.legal.updated}
+  meta={'effective · ' + site.legal.effective}
+  description="the agreement between you and KomKat Studio for the loggoo app: your content stays yours, purchases are one-time, and loggoo is not health care."
+>
+  <p class="legal__intro">
+    these terms are the agreement between you and {site.studio} for the loggoo mobile app. plain version: loggoo is a
+    private daily log, your content is yours, purchases are one-time, and we ask you not to break the app or the law with it.
+  </p>
+
+  <h2>1 · who we are</h2>
+  <p>
+    loggoo is published by {site.studio} ("we", "us"). you can reach us any time at
+    <a href={'mailto:' + site.email}>{site.email}</a>. by downloading or using loggoo you agree to these terms. if you do
+    not agree, please do not use the app.
+  </p>
+
+  <h2>2 · your licence to use loggoo</h2>
+  <p>
+    we grant you a personal, non-exclusive, non-transferable licence to install and use loggoo on devices you own or
+    control, for your own non-commercial use. you may not copy, sell, rent, reverse-engineer, decompile or attempt to
+    extract our source code, and you may not remove the loggoo watermark from generated frames in order to pass the
+    output off as another product.
+  </p>
+
+  <h2>3 · no account, and what that means</h2>
+  <p>
+    loggoo does not require you to create an account. because there is no account, we cannot recover your moments for you
+    if you lose your device, uninstall the app, or reset it without a backup. keeping cloud backup switched on, or
+    exporting the frames you care about, is your safety net.
+  </p>
+
+  <h2>4 · your content</h2>
+  <p>
+    photos, moods, notes and frames you create in loggoo are yours. we claim no ownership of them and no licence to use
+    them. they are stored on your device, and — only if you switch it on — in your own cloud storage account. you are
+    responsible for having the right to photograph and store the people, places and material you log.
+  </p>
+
+  <h2>5 · acceptable use</h2>
+  <p>
+    do not use loggoo to store or share content that is unlawful, or that infringes someone else's rights or privacy. do
+    not interfere with the app's operation, attempt to bypass purchase verification, or use automated means to access
+    features you have not bought.
+  </p>
+
+  <h2>6 · purchases and refunds</h2>
+  <p>
+    logging is free. some content — additional mood face packs and frame templates — is sold as a one-time in-app
+    purchase. all payments are processed by the apple app store or google play, not by us; we never see your card
+    details. purchases are tied to the store account that bought them and can be restored on that platform. refunds are
+    handled under apple's or google's policies, so refund requests go to them; write to us anyway if something went wrong
+    and we will help where we can.
+  </p>
+
+  <h2>7 · optional cloud sync and backup</h2>
+  <p>
+    if you enable backup or sync, loggoo writes a copy of your data into your own icloud or google account. that storage
+    is governed by apple's or google's terms, and its availability, capacity and pricing are outside our control. we do
+    not operate a loggoo server holding your photos or notes.
+  </p>
+
+  <h2>8 · changes to the app</h2>
+  <p>
+    we improve loggoo continuously and may add, change or retire features. if we ever have to retire a feature you paid
+    for, we will say so in the release notes and offer a reasonable equivalent. we may also stop supporting older
+    operating system versions.
+  </p>
+
+  <h2>9 · disclaimer — loggoo is not health care</h2>
+  <p>
+    loggoo helps you notice patterns in how your days feel. it is not a medical device, it does not diagnose or treat
+    anything, and its trends and observations are not clinical advice. if you are struggling, please talk to a qualified
+    professional or a local support line.
+  </p>
+  <p>
+    the app is provided "as is" and "as available", without warranties of any kind to the fullest extent permitted by
+    law, including fitness for a particular purpose or uninterrupted operation.
+  </p>
+
+  <h2>10 · limitation of liability</h2>
+  <p>
+    to the extent permitted by law, {site.studio} is not liable for indirect, incidental or consequential damages, or for
+    lost data or lost content arising from your use of loggoo. where liability cannot be excluded, it is limited to the
+    amount you paid us for the app in the twelve months before the claim. nothing here limits rights you have as a
+    consumer under mandatory local law.
+  </p>
+
+  <h2>11 · ending these terms</h2>
+  <p>
+    you may stop using loggoo and delete the app at any time. we may suspend your licence if you materially breach these
+    terms — for example by attempting to circumvent purchases. sections 4, 9, 10 and 12 survive termination.
+  </p>
+
+  <h2>12 · governing law</h2>
+  <p>
+    these terms are governed by the laws of the jurisdiction in which {site.studio} is established, without affecting
+    consumer protections that apply where you live. disputes will first be attempted to be resolved informally by email.
+  </p>
+
+  <h2>13 · updates to these terms</h2>
+  <p>
+    if we change these terms materially, we will update the date above and note it in the app release notes. continuing
+    to use loggoo after a change means you accept the revised terms.
+  </p>
+
+  <div class="legal__contact">
+    <h2>14 · contact</h2>
+    <p>
+      {site.studio} · <a href={'mailto:' + site.email}>{site.email}</a><br />
+      we read everything that arrives and usually reply within two days.
+    </p>
+  </div>
+</Legal>

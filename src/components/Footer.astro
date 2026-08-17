@@ -1,0 +1,40 @@
+---
+import { site } from '../data/site';
+import Logo from './Logo.astro';
+---
+<footer class="footer">
+  <div class="wrap footer__inner">
+    <div class="footer__brand">
+      <Logo size={30} />
+      <p>snap &amp; frame your day. made with care by {site.studio}.</p>
+    </div>
+    <nav class="footer__col">
+      <p class="footer__label">APP</p>
+      <a href={site.appStore}>ios</a>
+      <a href={site.playStore}>android</a>
+      <a href="/#features">features</a>
+    </nav>
+    <nav class="footer__col">
+      <p class="footer__label">LEGAL</p>
+      <a href="/terms">terms of service</a>
+      <a href="/privacy">privacy policy</a>
+    </nav>
+    <nav class="footer__col">
+      <p class="footer__label">CONTACT</p>
+      <a href={`mailto:${site.email}`}>{site.email}</a>
+    </nav>
+  </div>
+  <div class="wrap footer__legal">© 2026 {site.studioLegal} · all rights reserved</div>
+</footer>
+
+<style>
+  .footer { margin-top: 84px; border-top: 1px solid var(--lg-outline-variant); }
+  .footer__inner { display: flex; gap: 34px; flex-wrap: wrap; align-items: flex-start; padding-top: 38px; padding-bottom: 30px; }
+  .footer__brand { flex: 1; min-width: 250px; }
+  .footer__brand p { font-size: 13.5px; line-height: 1.6; color: var(--lg-on-surface-subtle); margin: 10px 0 0; max-width: 280px; }
+  .footer__col { display: flex; flex-direction: column; gap: 9px; min-width: 140px; }
+  .footer__col a { font-size: 13.5px; color: var(--lg-on-surface-variant); }
+  .footer__col a:hover { color: var(--lg-on-primary-container); }
+  .footer__label { font-size: 11.5px; font-weight: 700; letter-spacing: .6px; color: var(--lg-on-surface-muted); margin: 0; }
+  .footer__legal { font-size: 12.5px; color: var(--lg-on-surface-muted); padding-bottom: 34px; }
+</style>

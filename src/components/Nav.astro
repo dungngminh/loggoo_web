@@ -1,0 +1,38 @@
+---
+import { site } from '../data/site';
+import Logo from './Logo.astro';
+import StoreIcons from './StoreIcons.astro';
+---
+<header class="nav">
+  <div class="wrap nav__inner">
+    <a href="/" class="nav__brand" aria-label="loggoo home"><Logo size={34} /></a>
+    <nav class="nav__links">
+      <a href="/#features">features</a>
+      <a href="/#screens">screens</a>
+      <a href="/#streaks">streaks</a>
+      <a href="/#faq">faq</a>
+      <a href="/#about">about</a>
+    </nav>
+    <div class="nav__cta">
+      <a class="btn btn--ghost btn--sm" href={site.appStore}><StoreIcons store="ios" size={15} />app store</a>
+      <a class="btn btn--primary btn--sm" href={site.playStore}><StoreIcons store="android" size={15} />google play</a>
+    </div>
+  </div>
+</header>
+
+<style>
+  .nav {
+    position: sticky; top: 0; z-index: 80;
+    background: color-mix(in srgb, var(--lg-background) 86%, transparent);
+    backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--lg-outline-variant);
+  }
+  .nav__inner { display: flex; align-items: center; gap: 26px; padding-top: 14px; padding-bottom: 14px; }
+  .nav__brand { flex: none; }
+  .nav__links { flex: 1; display: flex; align-items: center; gap: 22px; font-size: 14px; font-weight: 600; }
+  .nav__links a { color: var(--lg-on-surface-variant); }
+  .nav__links a:hover { color: var(--lg-on-primary-container); }
+  .nav__cta { display: flex; gap: 9px; flex: none; }
+  @media (max-width: 900px) { .nav__links { display: none; } .nav__inner { justify-content: space-between; } }
+  @media (max-width: 560px) { .nav__cta a:first-child { display: none; } }
+</style>

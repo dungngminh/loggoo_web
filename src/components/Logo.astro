@@ -1,0 +1,30 @@
+---
+interface Props { size?: number; }
+const { size = 34 } = Astro.props;
+---
+<span class="logo" style={`--s:${size}px`}>
+  <span class="logo__tile">
+    <svg width={Math.round(size * 0.72)} height={Math.round(size * 0.72)} viewBox="0 0 48 48" fill="none" aria-hidden="true">
+      <circle cx="18.5" cy="26" r="10" stroke="#FBF6F0" stroke-width="5" />
+      <circle cx="29.5" cy="26" r="10" stroke="#FBF6F0" stroke-width="5" />
+      <circle cx="36.5" cy="11.5" r="5" fill="var(--lg-primary)" />
+    </svg>
+  </span>
+  <span class="logo__word">loggoo</span>
+</span>
+
+<style>
+  .logo { display: inline-flex; align-items: center; gap: 10px; }
+  .logo__tile {
+    width: var(--s); height: var(--s);
+    border-radius: calc(var(--s) * 0.35);
+    background: #211915;
+    display: flex; align-items: center; justify-content: center;
+    flex: none;
+  }
+  .logo__word {
+    font-family: var(--lg-font-display); font-weight: 700;
+    font-size: calc(var(--s) * 0.62); letter-spacing: -.5px;
+    color: var(--lg-on-background);
+  }
+</style>
