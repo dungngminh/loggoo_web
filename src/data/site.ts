@@ -8,7 +8,7 @@ export const site = {
   studioLegal: 'KomKat Studio',
   email: 'komkat.studio@gmail.com',
   appStore: 'https://apps.apple.com/app/loggoo',
-  playStore: 'https://play.google.com/store/apps/details?id=studio.komkat.loggoo',
+  playStore: 'https://play.google.com/store/apps/details?id=me.komkatstudio.loggoo',
   legal: {
     updated: 'august 17, 2026',
     effective: 'august 17, 2026'
