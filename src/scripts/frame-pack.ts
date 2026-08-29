@@ -1,6 +1,6 @@
-/** Pack schema v1 — the file committed to loggoo_asset. Canvas fractions, not pixels. */
+/** Pack schema v2 — the file committed to loggoo_asset. Canvas fractions, not pixels. */
 
-export const SCHEMA_VERSION = 1
+export const SCHEMA_VERSION = 2
 export const SLUG = /^[a-z0-9_]{1,40}$/
 export const BINDS = ['title', 'date', 'note', 'mood'] as const
 export const FONTS = ['poppins', 'caveat', 'sacramento', 'baloo', 'playfair'] as const
@@ -30,10 +30,18 @@ export type TextBind = {
   color: string
 }
 
+export type MoodPlacement = {
+  x: number
+  y: number
+  sizeDp: number
+  rotation: number
+}
+
 export type AspectLayout = {
   overlay: string
   slots: Slot[]
   texts: TextBind[]
+  mood?: MoodPlacement
 }
 
 export type PackManifest = {
@@ -106,12 +114,29 @@ export function sanitizeSlot(slot: Slot): Slot {
   }
 }
 
+const ASPECT_HEIGHT_DP: Record<Aspect, number> = {
+  story: 640,
+  post: 450,
+}
+
+export function sanitizeMood(mood: MoodPlacement, aspect: Aspect): MoodPlacement {
+  const sizeDp = round4(Math.min(180, Math.max(16, mood.sizeDp)))
+  const widthFraction = sizeDp / 360
+  const heightFraction = sizeDp / ASPECT_HEIGHT_DP[aspect]
+  return {
+    x: round4(clamp01(Math.min(mood.x, 1 - widthFraction))),
+    y: round4(clamp01(Math.min(mood.y, 1 - heightFraction))),
+    sizeDp,
+    rotation: round4(Math.min(45, Math.max(-45, mood.rotation))),
+  }
+}
+
 export function buildManifest(input: {
   id: string
   names: { en: string; vi: string }
   premium: boolean
-  story: { overlay: string; slots: Slot[]; texts: TextBind[] }
-  post: { overlay: string; slots: Slot[]; texts: TextBind[] }
+  story: { overlay: string; slots: Slot[]; texts: TextBind[]; mood?: MoodPlacement }
+  post: { overlay: string; slots: Slot[]; texts: TextBind[]; mood?: MoodPlacement }
 }): PackManifest {
   const storySlots = input.story.slots.map(sanitizeSlot)
   const postSlots = input.post.slots.map(sanitizeSlot)
@@ -126,8 +151,18 @@ export function buildManifest(input: {
     names: input.names,
     premium: input.premium,
     photoCapacity,
-    story: { overlay: input.story.overlay, slots: storySlots, texts: input.story.texts },
-    post: { overlay: input.post.overlay, slots: postSlots, texts: input.post.texts },
+    story: {
+      overlay: input.story.overlay,
+      slots: storySlots,
+      texts: input.story.texts,
+      ...(input.story.mood ? { mood: sanitizeMood(input.story.mood, 'story') } : {}),
+    },
+    post: {
+      overlay: input.post.overlay,
+      slots: postSlots,
+      texts: input.post.texts,
+      ...(input.post.mood ? { mood: sanitizeMood(input.post.mood, 'post') } : {}),
+    },
   }
 }
 
@@ -234,5 +269,7 @@ export function zipStore(files: { path: string; data: Uint8Array }[]): Blob {
     data.setUint32(12, central.length, true)
     data.setUint32(16, offset, true)
   })
-  return new Blob([concat([...locals, central, end])], { type: 'application/zip' })
+  const bytes = concat([...locals, central, end])
+  const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
+  return new Blob([buffer], { type: 'application/zip' })
 }

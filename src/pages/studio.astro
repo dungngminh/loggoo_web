@@ -9,7 +9,7 @@ import Logo from '../components/Logo.astro';
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>frame studio · {site.name}</title>
-    <meta name="description" content="Author a loggoo frame pack: drag photo slots on the overlay, export a zip, commit it to loggoo_asset." />
+    <meta name="description" content="Author a loggoo frame pack: place photo slots and an optional mood face, export a zip, and commit it to loggoo_asset." />
     <meta name="robots" content="noindex, nofollow" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="theme-color" content="#FBF6F0" />
@@ -58,6 +58,15 @@ import Logo from '../components/Logo.astro';
 
         <div class="studio__block">
           <div class="studio__row">
+            <p class="studio__label">mood face · optional</p>
+            <button class="btn btn--ghost btn--sm" type="button" data-add-mood>add mood face</button>
+            <button class="btn btn--ghost btn--sm" type="button" data-delete-mood hidden>delete mood</button>
+          </div>
+          <p class="studio__hint" data-mood-status>not used in this aspect</p>
+        </div>
+
+        <div class="studio__block">
+          <div class="studio__row">
             <p class="studio__label">photo slots</p>
             <button class="btn btn--ghost btn--sm" type="button" data-add-slot>add slot</button>
           </div>
@@ -87,7 +96,7 @@ import Logo from '../components/Logo.astro';
           <button type="button" data-aspect="post">post 4:5</button>
         </div>
         <p class="studio__stage-hint">
-          drag to draw a hole · move / resize · top knob rotates · inner dot rounds the corner ·
+          drag to draw a photo hole · move / resize · top knob rotates · inner dot rounds photo corners ·
           <span data-aspect-label>9:16 story</span>
         </p>
         <div class="stage">
@@ -95,6 +104,7 @@ import Logo from '../components/Logo.astro';
             <p class="frame__empty" data-overlay-empty>upload a story overlay</p>
             <img class="frame__overlay" data-overlay alt="" hidden />
             <div class="frame__slots" data-slots></div>
+            <div class="frame__mood" data-mood-layer></div>
             <div class="frame__rubber" data-rubber hidden></div>
           </div>
         </div>
@@ -337,7 +347,7 @@ import Logo from '../components/Logo.astro';
     pointer-events: none;
   }
   .frame:not(.has-overlay) .frame__empty { display: grid; }
-  .frame__slots, .frame__rubber { position: absolute; inset: 0; }
+  .frame__slots, .frame__mood, .frame__rubber { position: absolute; inset: 0; }
   .frame__rubber {
     border: 1.5px dashed var(--lg-secondary);
     background: color-mix(in srgb, var(--lg-primary) 28%, transparent);
@@ -438,6 +448,66 @@ import Logo from '../components/Logo.astro';
     transform: translateX(-50%);
     pointer-events: none;
   }
+  .mood-face {
+    position: absolute;
+    aspect-ratio: 1;
+    cursor: grab;
+    touch-action: none;
+    color: var(--lg-on-mood);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--lg-primary) 78%, transparent);
+    box-shadow: inset 0 0 0 1.5px rgba(74, 55, 40, .35);
+  }
+  .mood-face.is-selected {
+    z-index: 4;
+    cursor: grabbing;
+    box-shadow: inset 0 0 0 2.5px var(--lg-secondary);
+  }
+  .mood-face__art {
+    width: 100%;
+    height: 100%;
+    display: block;
+    pointer-events: none;
+  }
+  .mood-face__art path {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 3.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .mood-face__meta {
+    display: none;
+    position: absolute;
+    left: 50%;
+    bottom: -24px;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    padding: 3px 6px;
+    border-radius: 8px;
+    background: var(--lg-on-background);
+    color: var(--lg-background);
+    font-family: var(--lg-font-display);
+    font-size: 10px;
+    font-weight: 700;
+    pointer-events: none;
+  }
+  .mood-face.is-selected .mood-face__meta { display: block; }
+  .mood-face__size {
+    display: none;
+    position: absolute;
+    right: -6px;
+    bottom: -6px;
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    background: var(--lg-surface);
+    border: 1.5px solid var(--lg-secondary);
+    cursor: nwse-resize;
+    z-index: 5;
+  }
+  .mood-face.is-selected .mood-face__size,
+  .mood-face.is-selected .slot__rotate { display: block; }
   .slot-list { display: flex; flex-direction: column; gap: 6px; }
   .slot-row {
     display: flex;

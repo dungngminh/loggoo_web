@@ -1,6 +1,7 @@
 import {
   IMAGE_ACCEPT,
   type Aspect,
+  type MoodPlacement,
   type Slot,
   type TextBind,
   buildManifest,
@@ -15,18 +16,25 @@ type Handle = 'nw' | 'ne' | 'sw' | 'se'
 
 type DraftSlot = Slot & { id: string }
 type DraftText = TextBind & { id: string }
-type Layout = { slots: DraftSlot[]; texts: DraftText[] }
+type Layout = { slots: DraftSlot[]; texts: DraftText[]; mood?: MoodPlacement }
 
 type PointerMode =
   | { kind: 'move'; id: string; startX: number; startY: number; originX: number; originY: number }
   | { kind: 'resize'; id: string; handle: Handle; startX: number; startY: number; origin: Slot }
   | { kind: 'rotate'; id: string; origin: number; startAngle: number }
   | { kind: 'radius'; id: string }
+  | { kind: 'mood-move'; startX: number; startY: number; originX: number; originY: number }
+  | { kind: 'mood-resize' }
+  | { kind: 'mood-rotate'; origin: number; startAngle: number }
   | { kind: 'draw'; startX: number; startY: number }
 
 const RESIZE = new Set<string>(['nw', 'ne', 'sw', 'se'])
 const MAX_TILT = 45
 const MAX_CORNER = 24
+const FRAME_WIDTH_DP = 360
+const ASPECT_HEIGHT_DP: Record<Aspect, number> = { story: 640, post: 450 }
+const MIN_MOOD_SIZE_DP = 16
+const MAX_MOOD_SIZE_DP = 180
 
 const FILLS = ['#F6B393', '#9BD9B8', '#A9D6EE', '#F6E3A3', '#F3C3CB', '#E8804F']
 function uid(): string {
@@ -85,10 +93,15 @@ function defaultSlot(photo: number): DraftSlot {
   }
 }
 
+function defaultMood(): MoodPlacement {
+  return { x: 0.72, y: 0.08, sizeDp: 48, rotation: 0 }
+}
+
 export function mountStudio(root: HTMLElement): void {
   const frame = $('[data-frame]', root)
   const overlayImg = $('[data-overlay]', root) as HTMLImageElement
   const slotLayer = $('[data-slots]', root)
+  const moodLayer = $('[data-mood-layer]', root)
   const rubber = $('[data-rubber]', root)
   const list = $('[data-slot-list]', root)
   const inspector = $('[data-inspector]', root)
@@ -96,6 +109,9 @@ export function mountStudio(root: HTMLElement): void {
   const status = $('[data-status]', root)
   const toasts = $('[data-toasts]')
   const idLabel = $('[data-id]', root)
+  const addMoodButton = $('[data-add-mood]', root) as HTMLButtonElement
+  const deleteMoodButton = $('[data-delete-mood]', root) as HTMLButtonElement
+  const moodStatus = $('[data-mood-status]', root)
 
   const overlays: Record<Aspect, File | null> = { story: null, post: null }
   const overlayUrl: Record<Aspect, string | null> = { story: null, post: null }
@@ -106,6 +122,7 @@ export function mountStudio(root: HTMLElement): void {
 
   let aspect: Aspect = 'story'
   let selectedId: string | null = null
+  let moodSelected = false
   let pointer: PointerMode | null = null
   let iconFile: File | null = null
 
@@ -115,6 +132,19 @@ export function mountStudio(root: HTMLElement): void {
 
   function selected(): DraftSlot | undefined {
     return layout().slots.find((slot) => slot.id === selectedId)
+  }
+
+  function moodSizeFractions(mood: MoodPlacement): { width: number; height: number } {
+    return {
+      width: mood.sizeDp / FRAME_WIDTH_DP,
+      height: mood.sizeDp / ASPECT_HEIGHT_DP[aspect],
+    }
+  }
+
+  function clampMoodPosition(mood: MoodPlacement): void {
+    const size = moodSizeFractions(mood)
+    mood.x = clamp01(Math.min(mood.x, 1 - size.width))
+    mood.y = clamp01(Math.min(mood.y, 1 - size.height))
   }
 
   function setStatus(message: string): void {
@@ -170,6 +200,20 @@ export function mountStudio(root: HTMLElement): void {
     return (Math.atan2(event.clientY - center.y, event.clientX - center.x) * 180) / Math.PI
   }
 
+  function moodCenterPx(mood: MoodPlacement): { x: number; y: number } {
+    const box = frame.getBoundingClientRect()
+    const size = moodSizeFractions(mood)
+    return {
+      x: box.left + (mood.x + size.width / 2) * box.width,
+      y: box.top + (mood.y + size.height / 2) * box.height,
+    }
+  }
+
+  function moodPointerAngle(event: PointerEvent, mood: MoodPlacement): number {
+    const center = moodCenterPx(mood)
+    return (Math.atan2(event.clientY - center.y, event.clientX - center.x) * 180) / Math.PI
+  }
+
   function applyTilt(degrees: number): number {
     const snapped = Math.abs(degrees) < 2 ? 0 : degrees
     return Math.round(clamp(snapped, -MAX_TILT, MAX_TILT))
@@ -202,9 +246,30 @@ export function mountStudio(root: HTMLElement): void {
     if (meta) meta.textContent = `${Math.round(slot.rotation)}° · r${Math.round(slot.cornerDp)}`
   }
 
+  function applyMoodBox(el: HTMLElement, mood: MoodPlacement): void {
+    el.classList.toggle('is-selected', moodSelected)
+    el.style.left = `${mood.x * 100}%`
+    el.style.top = `${mood.y * 100}%`
+    el.style.width = `${(mood.sizeDp / FRAME_WIDTH_DP) * 100}%`
+    el.style.transform = `rotate(${mood.rotation}deg)`
+    const meta = el.querySelector('.mood-face__meta')
+    if (meta) meta.textContent = `${Math.round(mood.rotation)}° · ${Math.round(mood.sizeDp)}dp`
+  }
+
   function paintDragging(): void {
-    if (!pointer || pointer.kind === 'draw') return
-    const slot = layout().slots.find((item) => item.id === pointer.id)
+    const currentPointer = pointer
+    if (!currentPointer || currentPointer.kind === 'draw') return
+    if (
+      currentPointer.kind === 'mood-move' ||
+      currentPointer.kind === 'mood-resize' ||
+      currentPointer.kind === 'mood-rotate'
+    ) {
+      const mood = layout().mood
+      const el = moodLayer.querySelector('[data-mood]')
+      if (mood && el instanceof HTMLElement) applyMoodBox(el, mood)
+      return
+    }
+    const slot = layout().slots.find((item) => item.id === currentPointer.id)
     if (!slot) return
     const el = slotLayer.querySelector(`[data-slot-id="${slot.id}"]`)
     if (el instanceof HTMLElement) applySlotBox(el, slot)
@@ -216,6 +281,33 @@ export function mountStudio(root: HTMLElement): void {
         node.classList.toggle('is-selected', node.dataset.slotId === selectedId)
       }
     }
+    const mood = moodLayer.querySelector('[data-mood]')
+    if (mood instanceof HTMLElement) mood.classList.toggle('is-selected', moodSelected)
+  }
+
+  function renderMood(): void {
+    moodLayer.replaceChildren()
+    const mood = layout().mood
+    addMoodButton.hidden = mood != null
+    deleteMoodButton.hidden = mood == null
+    moodStatus.textContent = mood == null ? 'not used in this aspect' : `${Math.round(mood.sizeDp)}dp mood face`
+    if (!mood) return
+
+    const el = document.createElement('div')
+    el.className = 'mood-face'
+    el.dataset.mood = ''
+    el.setAttribute('role', 'button')
+    el.setAttribute('aria-label', 'mood face placement')
+    el.innerHTML = `
+      <svg class="mood-face__art" viewBox="0 0 48 48" aria-hidden="true">
+        <path d="M13 20c1.6-2.6 4.6-2.6 6.2 0M28.8 20c1.6-2.6 4.6-2.6 6.2 0M15 27c3.2 5.4 14.8 5.4 18 0" />
+      </svg>
+      <span class="mood-face__meta"></span>
+      <span class="mood-face__size" data-mood-handle="resize" aria-label="resize mood face"></span>
+      <span class="slot__rotate" data-mood-handle="rotate" aria-label="rotate mood face"></span>
+    `
+    applyMoodBox(el, mood)
+    moodLayer.append(el)
   }
 
   function renderSlots(): void {
@@ -258,6 +350,7 @@ export function mountStudio(root: HTMLElement): void {
       list.append(row)
     }
     renderInspector()
+    renderMood()
   }
 
   function renderInspector(): void {
@@ -286,13 +379,32 @@ export function mountStudio(root: HTMLElement): void {
 
   function select(id: string | null): void {
     selectedId = id
+    moodSelected = false
     renderSlots()
+  }
+
+  function addMood(): void {
+    if (layout().mood) return
+    layout().mood = defaultMood()
+    selectedId = null
+    moodSelected = true
+    renderSlots()
+    setStatus(`${aspect} mood face added — move, resize, or rotate it on the canvas`)
+  }
+
+  function removeMood(): void {
+    if (!layout().mood) return
+    delete layout().mood
+    moodSelected = false
+    renderSlots()
+    setStatus(`${aspect} will not render a mood face`)
   }
 
   function addSlot(): void {
     const slots = layout().slots
     slots.push(defaultSlot(slots.length))
     selectedId = slots[slots.length - 1].id
+    moodSelected = false
     renderSlots()
     setStatus(`slot ${slots.length} added — drag it onto the hole`)
   }
@@ -333,12 +445,38 @@ export function mountStudio(root: HTMLElement): void {
     if (!(target instanceof HTMLElement)) return
     const { x, y } = localFrac(event)
     const handle = target.dataset.handle
+    const moodHandle = target.dataset.moodHandle
+    const moodEl = target.closest('[data-mood]')
     const slotEl = target.closest('[data-slot-id]')
-    if (handle && slotEl instanceof HTMLElement) {
+    if (moodEl instanceof HTMLElement) {
+      const mood = layout().mood
+      if (!mood) return
+      selectedId = null
+      moodSelected = true
+      if (moodHandle === 'rotate') {
+        pointer = {
+          kind: 'mood-rotate',
+          origin: mood.rotation,
+          startAngle: moodPointerAngle(event, mood),
+        }
+      } else if (moodHandle === 'resize') {
+        pointer = { kind: 'mood-resize' }
+      } else {
+        pointer = {
+          kind: 'mood-move',
+          startX: x,
+          startY: y,
+          originX: mood.x,
+          originY: mood.y,
+        }
+      }
+      paintSelection()
+    } else if (handle && slotEl instanceof HTMLElement) {
       const id = slotEl.dataset.slotId
       const slot = layout().slots.find((item) => item.id === id)
       if (!slot || !id) return
       selectedId = id
+      moodSelected = false
       if (handle === 'rotate') {
         pointer = { kind: 'rotate', id, origin: slot.rotation, startAngle: pointerAngle(event, slot) }
       } else if (handle === 'radius') {
@@ -358,10 +496,12 @@ export function mountStudio(root: HTMLElement): void {
       const slot = layout().slots.find((item) => item.id === id)
       if (!slot || !id) return
       selectedId = id
+      moodSelected = false
       pointer = { kind: 'move', id, startX: x, startY: y, originX: slot.x, originY: slot.y }
       paintSelection()
     } else {
       selectedId = null
+      moodSelected = false
       pointer = { kind: 'draw', startX: x, startY: y }
       rubber.hidden = false
       paintSelection()
@@ -371,38 +511,68 @@ export function mountStudio(root: HTMLElement): void {
   })
 
   frame.addEventListener('pointermove', (event) => {
-    if (!pointer) return
+    const currentPointer = pointer
+    if (!currentPointer) return
     const { x, y } = localFrac(event)
-    if (pointer.kind === 'move') {
-      const slot = layout().slots.find((item) => item.id === pointer.id)
+    if (currentPointer.kind === 'move') {
+      const slot = layout().slots.find((item) => item.id === currentPointer.id)
       if (!slot) return
-      slot.x = clamp01(pointer.originX + (x - pointer.startX))
-      slot.y = clamp01(pointer.originY + (y - pointer.startY))
+      slot.x = clamp01(currentPointer.originX + (x - currentPointer.startX))
+      slot.y = clamp01(currentPointer.originY + (y - currentPointer.startY))
       slot.x = clamp01(Math.min(slot.x, 1 - slot.w))
       slot.y = clamp01(Math.min(slot.y, 1 - slot.h))
       paintDragging()
-    } else if (pointer.kind === 'resize') {
-      const slot = layout().slots.find((item) => item.id === pointer.id)
+    } else if (currentPointer.kind === 'resize') {
+      const slot = layout().slots.find((item) => item.id === currentPointer.id)
       if (!slot) return
-      Object.assign(slot, applyResize(pointer.origin, pointer.handle, x, y))
+      Object.assign(slot, applyResize(currentPointer.origin, currentPointer.handle, x, y))
       paintDragging()
-    } else if (pointer.kind === 'rotate') {
-      const slot = layout().slots.find((item) => item.id === pointer.id)
+    } else if (currentPointer.kind === 'rotate') {
+      const slot = layout().slots.find((item) => item.id === currentPointer.id)
       if (!slot) return
-      slot.rotation = applyTilt(pointer.origin + wrapDelta(pointerAngle(event, slot) - pointer.startAngle))
+      slot.rotation = applyTilt(
+        currentPointer.origin + wrapDelta(pointerAngle(event, slot) - currentPointer.startAngle),
+      )
       paintDragging()
-    } else if (pointer.kind === 'radius') {
-      const slot = layout().slots.find((item) => item.id === pointer.id)
+    } else if (currentPointer.kind === 'radius') {
+      const slot = layout().slots.find((item) => item.id === currentPointer.id)
       if (!slot) return
       slot.cornerDp = applyCorner(event, slot)
       paintDragging()
+    } else if (currentPointer.kind === 'mood-move') {
+      const mood = layout().mood
+      if (!mood) return
+      mood.x = currentPointer.originX + (x - currentPointer.startX)
+      mood.y = currentPointer.originY + (y - currentPointer.startY)
+      clampMoodPosition(mood)
+      paintDragging()
+    } else if (currentPointer.kind === 'mood-resize') {
+      const mood = layout().mood
+      if (!mood) return
+      const sizeFromX = (x - mood.x) * FRAME_WIDTH_DP
+      const sizeFromY = (y - mood.y) * ASPECT_HEIGHT_DP[aspect]
+      const maximum = Math.min(
+        MAX_MOOD_SIZE_DP,
+        (1 - mood.x) * FRAME_WIDTH_DP,
+        (1 - mood.y) * ASPECT_HEIGHT_DP[aspect],
+      )
+      mood.sizeDp = Math.round(clamp(Math.max(sizeFromX, sizeFromY), MIN_MOOD_SIZE_DP, maximum))
+      clampMoodPosition(mood)
+      paintDragging()
+    } else if (currentPointer.kind === 'mood-rotate') {
+      const mood = layout().mood
+      if (!mood) return
+      mood.rotation = applyTilt(
+        currentPointer.origin + wrapDelta(moodPointerAngle(event, mood) - currentPointer.startAngle),
+      )
+      paintDragging()
     } else {
-      const left = Math.min(pointer.startX, x)
-      const top = Math.min(pointer.startY, y)
+      const left = Math.min(currentPointer.startX, x)
+      const top = Math.min(currentPointer.startY, y)
       rubber.style.left = `${left * 100}%`
       rubber.style.top = `${top * 100}%`
-      rubber.style.width = `${Math.abs(x - pointer.startX) * 100}%`
-      rubber.style.height = `${Math.abs(y - pointer.startY) * 100}%`
+      rubber.style.width = `${Math.abs(x - currentPointer.startX) * 100}%`
+      rubber.style.height = `${Math.abs(y - currentPointer.startY) * 100}%`
     }
   })
 
@@ -447,6 +617,8 @@ export function mountStudio(root: HTMLElement): void {
 
   $('[data-add-slot]', root).addEventListener('click', addSlot)
   $('[data-delete-slot]', root).addEventListener('click', removeSelected)
+  addMoodButton.addEventListener('click', addMood)
+  deleteMoodButton.addEventListener('click', removeMood)
 
   root.querySelectorAll<HTMLButtonElement>('[data-aspect]').forEach((button) => {
     button.addEventListener('click', () => {
@@ -457,6 +629,7 @@ export function mountStudio(root: HTMLElement): void {
         node.classList.toggle('is-active', node === button)
       })
       selectedId = null
+      moodSelected = false
       renderOverlay()
       renderSlots()
     })
@@ -475,7 +648,8 @@ export function mountStudio(root: HTMLElement): void {
       return
     }
     overlays[aspect] = file
-    if (overlayUrl[aspect]) URL.revokeObjectURL(overlayUrl[aspect])
+    const previousUrl = overlayUrl[aspect]
+    if (previousUrl) URL.revokeObjectURL(previousUrl)
     overlayUrl[aspect] = URL.createObjectURL(file)
     renderOverlay()
     setStatus(`${aspect} overlay loaded — drag slots onto the holes`)
@@ -510,10 +684,13 @@ export function mountStudio(root: HTMLElement): void {
     if (event.key !== 'Backspace' && event.key !== 'Delete') return
     const active = document.activeElement
     if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) return
-    if (!root.contains(active) && selectedId == null) return
+    if (!root.contains(active) && selectedId == null && !moodSelected) return
     if (selectedId) {
       event.preventDefault()
       removeSelected()
+    } else if (moodSelected) {
+      event.preventDefault()
+      removeMood()
     }
   })
 
@@ -576,8 +753,18 @@ export function mountStudio(root: HTMLElement): void {
         id,
         names: { en, vi },
         premium: input('[name="premium"]', root).checked,
-        story: { overlay: storyOverlay, slots: layouts.story.slots, texts: texts('story') },
-        post: { overlay: postOverlay, slots: layouts.post.slots, texts: texts('post') },
+        story: {
+          overlay: storyOverlay,
+          slots: layouts.story.slots,
+          texts: texts('story'),
+          mood: layouts.story.mood,
+        },
+        post: {
+          overlay: postOverlay,
+          slots: layouts.post.slots,
+          texts: texts('post'),
+          mood: layouts.post.mood,
+        },
       })
       const entry = catalogSnippet(manifest, iconName)
       const encoder = new TextEncoder()
