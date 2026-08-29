@@ -332,6 +332,7 @@ import Logo from '../components/Logo.astro';
     object-fit: fill;
     pointer-events: none;
     border-radius: 18px;
+    z-index: 0;
   }
   .frame__overlay[hidden] { display: none !important; }
   .frame__empty {
@@ -348,7 +349,10 @@ import Logo from '../components/Logo.astro';
   }
   .frame:not(.has-overlay) .frame__empty { display: grid; }
   .frame__slots, .frame__mood, .frame__rubber { position: absolute; inset: 0; }
+  .frame__slots { z-index: 1; }
+  .frame__mood { z-index: 2; }
   .frame__rubber {
+    z-index: 3;
     border: 1.5px dashed var(--lg-secondary);
     background: color-mix(in srgb, var(--lg-primary) 28%, transparent);
     pointer-events: none;
