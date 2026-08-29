@@ -1,0 +1,478 @@
+---
+import '../styles/global.css';
+import { site } from '../data/site';
+import Logo from '../components/Logo.astro';
+---
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>frame studio · {site.name}</title>
+    <meta name="description" content="Author a loggoo frame pack: drag photo slots on the overlay, export a zip, commit it to loggoo_asset." />
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="theme-color" content="#FBF6F0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Nunito:ital,wght@0,400;0,600;0,700;1,400&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <header class="studio-nav">
+      <a href="/" class="studio-nav__brand" aria-label="loggoo home"><Logo size={30} /></a>
+      <p class="studio-nav__title">frame studio</p>
+      <p class="studio-nav__note">unlisted · export zip → commit to loggoo_asset</p>
+    </header>
+
+    <div id="studio" class="studio">
+      <aside class="studio__side">
+        <label class="field">
+          <span>name · en</span>
+          <input name="nameEn" type="text" placeholder="scrapbook" autocomplete="off" />
+        </label>
+        <label class="field">
+          <span>name · vi</span>
+          <input name="nameVi" type="text" placeholder="sổ dán" autocomplete="off" />
+        </label>
+        <p class="studio__id">id · <code data-id>—</code></p>
+        <label class="check">
+          <input name="premium" type="checkbox" checked />
+          <span>loggoo plus</span>
+        </label>
+
+        <div class="studio__block">
+          <p class="studio__label">overlay for this aspect</p>
+          <p class="studio__hint">png, jpg, or jpeg. use png if the holes should be transparent.</p>
+          <label class="file">
+            <input data-overlay-file type="file" accept="image/png,image/jpeg,.png,.jpg,.jpeg" />
+            <span>upload png / jpg</span>
+          </label>
+          <label class="file">
+            <input data-icon-file type="file" accept="image/png,image/jpeg,.png,.jpg,.jpeg" />
+            <span>rail icon (optional)</span>
+          </label>
+        </div>
+
+        <div class="studio__block">
+          <div class="studio__row">
+            <p class="studio__label">photo slots</p>
+            <button class="btn btn--ghost btn--sm" type="button" data-add-slot>add slot</button>
+          </div>
+          <div class="slot-list" data-slot-list></div>
+          <div class="inspector" data-inspector hidden>
+            <label class="field">
+              <span>photo index</span>
+              <input data-slot-photo type="number" min="1" step="1" />
+            </label>
+            <button class="btn btn--ghost btn--sm" type="button" data-delete-slot>delete slot</button>
+          </div>
+        </div>
+
+        <div class="studio__block">
+          <button class="btn btn--primary" type="button" data-export>export zip</button>
+          <p class="studio__hint" data-status></p>
+          <label class="field">
+            <span>catalog.json snippet</span>
+            <textarea data-snippet rows="8" readonly placeholder="appears here after a successful export"></textarea>
+          </label>
+        </div>
+      </aside>
+
+      <section class="studio__stage">
+        <div class="aspect-toggle" role="tablist" aria-label="frame aspect">
+          <button class="is-active" type="button" data-aspect="story">story 9:16</button>
+          <button type="button" data-aspect="post">post 4:5</button>
+        </div>
+        <p class="studio__stage-hint">
+          drag to draw a hole · move / resize · top knob rotates · inner dot rounds the corner ·
+          <span data-aspect-label>9:16 story</span>
+        </p>
+        <div class="stage">
+          <div class="frame" data-frame data-aspect="story">
+            <p class="frame__empty" data-overlay-empty>upload a story overlay</p>
+            <img class="frame__overlay" data-overlay alt="" hidden />
+            <div class="frame__slots" data-slots></div>
+            <div class="frame__rubber" data-rubber hidden></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="toasts" data-toasts aria-live="polite" aria-relevant="additions"></div>
+
+    <script>
+      import { mountStudio } from '../scripts/frame-studio'
+      mountStudio(document.getElementById('studio')!)
+    </script>
+  </body>
+</html>
+
+<style is:global>
+  html:has(.studio),
+  body:has(.studio) {
+    height: 100%;
+    overflow: hidden;
+  }
+  body:has(.studio) {
+    display: flex;
+    flex-direction: column;
+    overscroll-behavior: none;
+  }
+  .studio-nav {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 22px;
+    border-bottom: 1px solid var(--lg-outline-variant);
+    background: color-mix(in srgb, var(--lg-background) 88%, transparent);
+    flex: none;
+  }
+  .studio-nav__title {
+    margin: 0;
+    font-family: var(--lg-font-display);
+    font-weight: 700;
+    font-size: 16px;
+  }
+  .studio-nav__note {
+    margin: 0 0 0 auto;
+    font-size: 12.5px;
+    color: var(--lg-on-surface-muted);
+  }
+  .studio {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 320px minmax(0, 1fr);
+  }
+  .studio__side {
+    padding: 20px 18px 32px;
+    border-right: 1px solid var(--lg-outline-variant);
+    background: var(--lg-surface);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    overflow: auto;
+    min-height: 0;
+    scrollbar-gutter: stable;
+  }
+  .studio__stage {
+    padding: 18px 22px 22px;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .studio__block { display: flex; flex-direction: column; gap: 10px; }
+  .studio__row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .studio__label {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .6px;
+    text-transform: uppercase;
+    color: var(--lg-on-surface-muted);
+  }
+  .studio__hint {
+    margin: 0;
+    font-size: 13px;
+    color: var(--lg-on-surface-subtle);
+    line-height: 1.45;
+    min-height: 1.45em;
+  }
+  .studio__id {
+    margin: -4px 0 0;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--lg-on-surface-muted);
+  }
+  .studio__id code {
+    font-family: ui-monospace, monospace;
+    font-weight: 600;
+    color: var(--lg-on-surface-variant);
+  }
+  .studio__stage-hint {
+    margin: 10px 0 0;
+    font-size: 13px;
+    color: var(--lg-on-surface-subtle);
+  }
+  .field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 700; color: var(--lg-on-surface-variant); }
+  .field em { font-style: normal; font-weight: 600; color: var(--lg-on-surface-subtle); float: right; }
+  .field input[type="text"],
+  .field input[type="number"],
+  .field textarea {
+    font: inherit;
+    font-weight: 600;
+    color: var(--lg-on-background);
+    background: var(--lg-background);
+    border: 1px solid var(--lg-outline);
+    border-radius: 14px;
+    padding: 10px 12px;
+  }
+  .field textarea { font-family: ui-monospace, monospace; font-size: 11.5px; font-weight: 500; resize: vertical; }
+  .field input.is-invalid,
+  .field textarea.is-invalid {
+    border-color: var(--lg-error);
+    background: color-mix(in srgb, var(--lg-error) 8%, var(--lg-background));
+  }
+  .toasts {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 22px;
+    z-index: 90;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    pointer-events: none;
+    padding: 0 20px;
+  }
+  .toast {
+    pointer-events: auto;
+    max-width: 420px;
+    width: min(100%, 420px);
+    padding: 16px 20px;
+    border-radius: 999px;
+    font-family: var(--lg-font-body);
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1.35;
+    box-shadow: 0 16px 28px -18px rgba(74, 55, 40, .55);
+    animation: toast-in .22s ease;
+  }
+  .toast.is-leaving { animation: toast-out .2s ease forwards; }
+  .toast--error { background: var(--lg-error); color: var(--lg-on-error); }
+  .toast--success { background: var(--lg-primary); color: var(--lg-on-primary); }
+  .toast--info { background: var(--lg-on-background); color: var(--lg-background); }
+  @keyframes toast-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+  @keyframes toast-out { to { opacity: 0; transform: translateY(10px); } }
+  @media (prefers-reduced-motion: reduce) {
+    .toast, .toast.is-leaving { animation: none; }
+  }
+  .check { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; }
+  .file { position: relative; }
+  .file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .file span {
+    display: flex; justify-content: center;
+    padding: 10px; border-radius: 14px;
+    border: 1px dashed var(--lg-outline);
+    background: var(--lg-background);
+    font-size: 13px; font-weight: 700;
+    color: var(--lg-on-primary-container);
+  }
+  .aspect-toggle {
+    display: inline-flex;
+    gap: 6px;
+    padding: 4px;
+    border-radius: 16px;
+    background: var(--lg-surface-dim);
+    width: max-content;
+  }
+  .aspect-toggle button {
+    border: 0;
+    background: transparent;
+    padding: 8px 14px;
+    border-radius: 12px;
+    font-family: var(--lg-font-display);
+    font-weight: 700;
+    font-size: 13.5px;
+    color: var(--lg-on-surface-variant);
+    cursor: pointer;
+  }
+  .aspect-toggle button.is-active {
+    background: var(--lg-surface);
+    color: var(--lg-on-background);
+  }
+  .stage {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    place-items: center;
+    padding: 16px 0 0;
+    container-type: size;
+  }
+  .frame {
+    position: relative;
+    aspect-ratio: 9 / 16;
+    width: min(100cqw, calc(100cqh * 9 / 16));
+    height: min(100cqh, calc(100cqw * 16 / 9));
+    cursor: crosshair;
+    background: var(--lg-surface-container);
+    border-radius: 18px;
+    overflow: visible;
+    box-shadow: 0 22px 40px -24px rgba(74, 55, 40, .55);
+    touch-action: none;
+    user-select: none;
+  }
+  .frame[data-aspect="post"] {
+    aspect-ratio: 4 / 5;
+    width: min(100cqw, calc(100cqh * 4 / 5));
+    height: min(100cqh, calc(100cqw * 5 / 4));
+  }
+  .frame__overlay {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    object-fit: fill;
+    pointer-events: none;
+    border-radius: 18px;
+  }
+  .frame__overlay[hidden] { display: none !important; }
+  .frame__empty {
+    display: none;
+    margin: 0;
+    position: absolute;
+    inset: 0;
+    place-items: center;
+    font-family: var(--lg-font-display);
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--lg-on-surface-muted);
+    pointer-events: none;
+  }
+  .frame:not(.has-overlay) .frame__empty { display: grid; }
+  .frame__slots, .frame__rubber { position: absolute; inset: 0; }
+  .frame__rubber {
+    border: 1.5px dashed var(--lg-secondary);
+    background: color-mix(in srgb, var(--lg-primary) 28%, transparent);
+    pointer-events: none;
+  }
+  .slot {
+    position: absolute;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    cursor: grab;
+    touch-action: none;
+    overflow: visible;
+  }
+  .slot.is-selected { z-index: 2; cursor: grabbing; }
+  .slot__fill {
+    position: absolute;
+    inset: 0;
+    background: var(--fill);
+    opacity: .82;
+    border-radius: calc(var(--corner) * 1px);
+    box-shadow: inset 0 0 0 1.5px rgba(74, 55, 40, .35);
+    pointer-events: none;
+  }
+  .slot.is-selected .slot__fill {
+    box-shadow: inset 0 0 0 2.5px var(--lg-secondary);
+    opacity: .9;
+  }
+  .slot__label {
+    position: absolute;
+    left: 8px;
+    bottom: 7px;
+    font-family: var(--lg-font-display);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--lg-on-mood);
+    pointer-events: none;
+  }
+  .slot__meta {
+    display: none;
+    position: absolute;
+    right: 6px;
+    top: 6px;
+    font-family: var(--lg-font-display);
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--lg-on-mood);
+    pointer-events: none;
+  }
+  .slot.is-selected .slot__meta { display: block; }
+  .slot__handle {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    background: var(--lg-surface);
+    border: 1.5px solid var(--lg-secondary);
+    display: none;
+    z-index: 3;
+  }
+  .slot.is-selected .slot__handle { display: block; }
+  .slot__handle[data-handle="nw"] { left: -6px; top: -6px; cursor: nwse-resize; }
+  .slot__handle[data-handle="ne"] { right: -6px; top: -6px; cursor: nesw-resize; }
+  .slot__handle[data-handle="sw"] { left: -6px; bottom: -6px; cursor: nesw-resize; }
+  .slot__handle[data-handle="se"] { right: -6px; bottom: -6px; cursor: nwse-resize; }
+  .slot__handle--radius {
+    left: calc(var(--corner) * 1px);
+    top: calc(var(--corner) * 1px);
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    cursor: nwse-resize;
+  }
+  .slot__rotate {
+    display: none;
+    position: absolute;
+    left: 50%;
+    top: -28px;
+    width: 14px;
+    height: 14px;
+    margin-left: -7px;
+    border-radius: 50%;
+    background: var(--lg-surface);
+    border: 1.5px solid var(--lg-secondary);
+    cursor: grab;
+    z-index: 4;
+  }
+  .slot.is-selected .slot__rotate { display: block; }
+  .slot__rotate::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 14px;
+    width: 1.5px;
+    height: 14px;
+    background: var(--lg-secondary);
+    transform: translateX(-50%);
+    pointer-events: none;
+  }
+  .slot-list { display: flex; flex-direction: column; gap: 6px; }
+  .slot-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    border: 1px solid var(--lg-outline-variant);
+    background: var(--lg-background);
+    border-radius: 12px;
+    padding: 8px 10px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--lg-on-background);
+    cursor: pointer;
+  }
+  .slot-row.is-selected {
+    border-color: var(--lg-primary-hover);
+    background: var(--lg-primary-container);
+  }
+  .inspector {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+    border-radius: 16px;
+    background: var(--lg-surface-container);
+  }
+  .inspector[hidden] { display: none; }
+  input[type="range"] { width: 100%; accent-color: var(--lg-secondary); }
+
+  @media (max-width: 900px) {
+    body:has(.studio) { overflow: auto; }
+    .studio { grid-template-columns: 1fr; height: auto; flex: none; }
+    .studio__side { border-right: 0; border-bottom: 1px solid var(--lg-outline-variant); max-height: none; }
+    .studio__stage { min-height: 72dvh; }
+    .studio-nav__note { display: none; }
+  }
+</style>
