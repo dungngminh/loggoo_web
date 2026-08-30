@@ -6,15 +6,16 @@ import { site } from '../data/site';
   title="privacy policy"
   updated={site.legal.updated}
   meta="applies to · loggoo for ios and android"
-  description="loggoo keeps your photos, notes and moods on your device. no account, no ads, no data selling — only anonymous crash and usage diagnostics."
+  description="loggoo keeps your photos, notes and moods on your device. no account, no ads, no data selling — only diagnostics, usage counters and the push signals needed to send a reminder."
 >
   <div class="legal__panel">
     <h2>the short version</h2>
     <ul class="legal__checks">
-      <li>your photos, notes and moods stay on your device. we cannot see them.</li>
+      <li>your photos, videos, notes and moods stay on your device. we cannot see them.</li>
       <li>no account, so we hold no name, email or profile for you.</li>
-      <li>we collect anonymous, aggregated usage and crash data to fix what breaks.</li>
-      <li>no ads, no ad sdks, no selling or sharing of your data. ever.</li>
+      <li>we collect crash reports and usage counters tied to a random app id, never to your identity.</li>
+      <li>if you allow notifications, a push service holds your device's push token and a few counts about your streak.</li>
+      <li>no ads, no ad sdks, no advertising profiles, no selling or sharing of your data. ever.</li>
     </ul>
   </div>
 
@@ -26,70 +27,99 @@ import { site } from '../data/site';
 
   <h2>2 · what stays on your device</h2>
   <p>
-    everything you log — photos taken in or imported into loggoo, mood entries, notes, streak history and frames you
-    generate — is written to your device's local storage. it is not uploaded to any loggoo server, because we do not run
-    one for user content. camera and photo library permissions are requested only when you use those features, and can be
-    withdrawn in your device settings at any time.
+    everything you log — photos and videos taken in or imported into loggoo, mood entries, notes, streak history and
+    frames you generate — is written to your device's local storage. it is not uploaded to any loggoo server, because we
+    do not run one for user content. camera, microphone, photo library and notification permissions are requested only
+    when you use those features, and can be withdrawn in your device settings at any time.
   </p>
 
-  <h2>3 · optional cloud sync and backup</h2>
+  <h2>3 · optional icloud sync</h2>
   <p>
-    if you switch on backup or sync, loggoo stores an encrypted copy of your log in <strong>your own</strong> icloud or
-    google drive account so you can restore it on a new device. that copy lives under your cloud account, governed by
-    apple's or google's privacy policy. we have no access to it and cannot read, restore or delete it on your behalf.
-    switching the setting off stops future uploads; removing the existing copy is done from your cloud account.
+    on iphone and ipad, loggoo plus members can turn on icloud sync. loggoo then copies your entries and their media
+    into the private database of <strong>your own</strong> icloud account, so a second device signed into the same apple
+    id sees the same journal. that copy lives under your apple id, governed by apple's privacy policy. we have no access
+    to it and cannot read, restore or delete it on your behalf. turning sync off stops future uploads; removing the
+    existing copy is done from your icloud account. the android build has no icloud transport and never syncs.
   </p>
 
   <h2>4 · what we do collect</h2>
-  <p>to keep the app working we collect anonymous, aggregated diagnostics that are not linked to your identity:</p>
+  <p>to keep the app working we collect a small set of data that is not linked to your identity:</p>
   <ul class="legal__items">
     <li>
-      <strong>crash and error reports</strong> — device model, os version, app version, and the technical stack trace of
-      the failure.
+      <strong>crash and error reports</strong> — device model, os version, app version, a random installation id, and the
+      technical stack trace of the failure.
     </li>
     <li>
-      <strong>feature counters</strong> — for example "a frame was exported" or "a mood was logged", as counts only.
-      never the photo, the note text or the mood value tied to a person.
+      <strong>usage events</strong> — bounded product signals such as "a record was logged" (with its type, the hour of
+      day, the day of week and the mood you picked), "a frame was exported" (with the template), streak length, screen
+      names, and sync outcomes. never the photo, the video, the note text, or an exact date and time.
     </li>
     <li>
-      <strong>purchase validation</strong> — the receipt token from apple or google needed to confirm a pack you bought,
-      plus the store country.
+      <strong>push subscription</strong> — see section 5.
+    </li>
+    <li>
+      <strong>purchase validation</strong> — the receipt token from apple or google needed to confirm what you bought, a
+      random purchase-service id, the store country and the state of your loggoo plus entitlement.
     </li>
   </ul>
   <p>
-    we do not collect your name, email, phone number, contacts, precise location or advertising identifiers. we do not
-    attempt to re-identify anonymous data.
+    we do not collect your name, email, phone number, contacts, precise location, health data or advertising identifiers.
+    we do not run ads, do not build advertising profiles, do not track you across other companies' apps or websites, and
+    do not attempt to re-identify this data.
   </p>
 
   <h2>5 · notifications</h2>
   <p>
-    the daily reminder is a local notification scheduled on your device at the hour you choose. it does not travel
-    through our servers and carries no content about your log. turn it off in loggoo's settings or in your device's
-    notification settings.
+    loggoo sends two different kinds of notification, and both need the one notification permission you grant on your
+    device.
+  </p>
+  <ul class="legal__items">
+    <li>
+      <strong>your daily reminder</strong> is a local notification scheduled on your device at the hour you choose. it
+      does not travel through any server and carries no content about your log.
+    </li>
+    <li>
+      <strong>reminders we send</strong> (for example, when a streak is about to break) go through onesignal, our push
+      provider. it holds your device's push token, a random subscription id, device model, os version, app version,
+      language, and the ip address the device connects from, which it turns into a coarse country and timezone.
+    </li>
+  </ul>
+  <p>
+    so those messages can be timed and targeted without a backend of ours, the app writes a few <strong>counts</strong>
+    to onesignal: the time of your most recent entry and of your first entry — both rounded down to the hour — your
+    current and longest streak, your total number of entries, whether loggoo plus is active, and whether your daily
+    reminder is on and at what hour. no caption, mood, photo, entry id or exact timestamp is ever sent. turning off
+    notifications for loggoo in your device settings stops every push; you can also ask us to delete your push record at
+    the address in section 14.
   </p>
 
   <h2>6 · purchases</h2>
   <p>
-    in-app purchases are processed entirely by the apple app store or google play. we never receive your payment card,
-    billing address or full store account details — only the receipt needed to unlock what you bought and to let you
-    restore it later.
+    in-app purchases are processed entirely by the apple app store or google play, with revenuecat validating the receipt
+    and telling the app whether loggoo plus is active. we never receive your payment card, billing address or full store
+    account details — only what is needed to unlock what you bought and to let you restore it later.
   </p>
 
   <h2>7 · service providers we use</h2>
+  <p>we use a small number of processors, strictly for the purposes above:</p>
+  <ul class="legal__items">
+    <li><strong>google (firebase)</strong> — analytics, crashlytics crash reporting and remote config.</li>
+    <li><strong>onesignal</strong> — delivery and targeting of the push notifications described in section 5.</li>
+    <li><strong>revenuecat</strong> — purchase validation and entitlement state.</li>
+    <li><strong>apple and google</strong> — app distribution, payments, and, on ios and at your choice, icloud storage.</li>
+  </ul>
   <p>
-    we use a small number of processors strictly for the purposes above: apple and google (app distribution, payments,
-    and — at your choice — cloud storage), and a mobile crash-reporting and analytics provider that processes anonymous
-    diagnostics on our behalf. they may not use that data for their own advertising. we do not sell or share personal
-    information, and we have never received a legal request for user content — if that changes we will disclose what the
-    law allows us to disclose.
+    each is bound to process this data only on our instructions and may not use it for its own advertising. we do not
+    sell or share personal information, and we have never received a legal request for user content — if that changes we
+    will disclose what the law allows us to disclose.
   </p>
 
   <h2>8 · legal bases (eea / uk)</h2>
   <p>
     where the gdpr applies, we rely on: <strong>contract</strong> — to deliver the app and the purchases you make;
-    <strong>legitimate interests</strong> — to keep the app stable and secure through anonymous diagnostics; and
-    <strong>consent</strong> — for camera, photo library, notifications and optional cloud backup, each of which you
-    grant or withdraw yourself.
+    <strong>legitimate interests</strong> — to keep the app stable and secure through diagnostics and bounded usage
+    counters; and <strong>consent</strong> — for camera, microphone, photo library, notifications (including the push
+    messages in section 5) and optional icloud sync, each of which you grant or withdraw yourself.
   </p>
 
   <h2>9 · your rights</h2>
@@ -102,14 +132,16 @@ import { site } from '../data/site';
     the ccpa/cpra, californian residents have rights to know, delete and correct, and to opt out of sale or sharing — we
     do not sell or share personal information, so there is nothing to opt out of. we do not discriminate against anyone
     who exercises these rights. write to <a href={'mailto:' + site.email}>{site.email}</a> and we will respond within 30
-    days; note that anonymous diagnostics may not be identifiable enough for us to isolate your specific records.
+    days; note that diagnostics and usage events carry no identifier we can trace back to you, so we may not be able to
+    isolate your specific records.
   </p>
 
   <h2>10 · retention</h2>
   <p>
-    your log stays on your device until you delete it. anonymous crash and usage data is retained in aggregate for up to
-    14 months, then discarded. purchase receipts are retained as long as needed to honour restores and to meet tax and
-    accounting duties.
+    your log stays on your device until you delete it. crash and usage data is retained for up to 14 months, then
+    discarded. your push record and its counts are held while your device stays subscribed and are removed when you turn
+    notifications off or uninstall. purchase receipts are retained as long as needed to honour restores and to meet tax
+    and accounting duties.
   </p>
 
   <h2>11 · children</h2>
@@ -121,9 +153,10 @@ import { site } from '../data/site';
   <h2>12 · security and international transfers</h2>
   <p>
     local data is protected by your device's own encryption and lock screen; keeping a passcode on your phone is the
-    single most effective protection for your log. the limited anonymous data we receive may be processed on servers
-    outside your country under standard contractual clauses or equivalent safeguards. no method of storage or
-    transmission is perfectly secure, and we cannot guarantee absolute security.
+    single most effective protection for your log. everything the app does send is encrypted in transit. the limited data
+    our processors receive may be processed on servers outside your country, including in the united states, under
+    standard contractual clauses or equivalent safeguards. no method of storage or transmission is perfectly secure, and
+    we cannot guarantee absolute security.
   </p>
 
   <h2>13 · changes to this policy</h2>
