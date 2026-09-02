@@ -1,16 +1,17 @@
 ---
 const shots = [
-  { src: '/screens/compose.png', step: '1 · snap it', body: 'caption on the photo, mood underneath, send.', alt: 'loggoo camera screen with a caption typed on the photo and the mood row below' },
-  { src: '/screens/mood-sheet.png', step: '2 · feel it', body: 'one sheet, five faces, no typing required.', alt: 'loggoo mood sheet asking how do you feel right now' },
-  { src: '/screens/note-sheet.png', step: '3 · say it', body: '280 characters. a sentence you want to keep.', alt: 'loggoo note sheet asking what happened, with a 280 character limit' },
-  { src: '/screens/frame-polaroid.png', step: '4 · frame it', body: 'save it, or send it to whoever was there.', alt: 'loggoo frame studio showing the polaroid template of the day' }
+  { src: '/screens/compose.png', step: '1 · snap it', body: 'caption on the photo, mood underneath, send.', alt: 'loggoo add to today screen with a photo, caption overlay and mood picker' },
+  { src: '/screens/note-sheet.png', step: '2 · clip it', body: 'short video, mood tag, one line — same flow as a photo.', alt: 'loggoo add to today screen with a video clip, mood picker and send button' },
+  { src: '/screens/frame-polaroid.png', step: '3 · frame it', body: 'seven templates. save it, or send it to whoever was there.', alt: 'loggoo frame studio showing the polaroid template of the day' },
+  { src: '/screens/mood-sheet.png', step: '4 · track it', body: 'weekly averages, best days and how the week split — no lecture.', alt: 'loggoo mood trends screen with a weekly bar chart and mood breakdown' },
+  { src: '/screens/frame-hero.png', step: '5 · make it yours', body: 'fifteen mood face packs. classic to jelly — your app, your vibe.', alt: 'loggoo mood faces pack picker with classic, pixel, cute and more' }
 ];
 ---
 <section class="section wrap" id="screens">
   <div class="screens__head">
     <div>
       <p class="eyebrow">INSIDE THE APP</p>
-      <h2 class="h2">four screens, start to shareable.</h2>
+      <h2 class="h2">five screens, start to shareable.</h2>
     </div>
     <p class="screens__note">shot on a real phone, on a real tuesday. nothing here is a mockup.</p>
   </div>
@@ -29,10 +30,11 @@ const shots = [
   .screens__head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
   .screens__head .h2 { margin-top: 12px; max-width: 560px; }
   .screens__note { font-size: 14px; color: var(--lg-on-surface-subtle); max-width: 300px; margin: 0; text-wrap: pretty; }
-  .screens__grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin: 36px 0 0; padding: 0; list-style: none; align-items: end; }
+  .screens__grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 18px; margin: 36px 0 0; padding: 0; list-style: none; align-items: end; }
   .screens__item img { width: 100%; filter: drop-shadow(0 26px 40px rgba(74,55,40,.2)); }
   .screens__step { font-size: 15px; margin-top: 14px; }
   .screens__body { font-size: 13.5px; line-height: 1.55; color: var(--lg-on-surface-variant); margin: 4px 0 0; }
+  @media (max-width: 1100px) { .screens__grid { grid-template-columns: repeat(3, 1fr); } }
   @media (max-width: 860px) { .screens__grid { grid-template-columns: repeat(2, 1fr); gap: 24px; } }
   @media (max-width: 460px) { .screens__grid { grid-template-columns: 1fr; } }
 </style>
