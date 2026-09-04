@@ -7,7 +7,7 @@ export const site = {
   studio: 'komkat studio',
   studioLegal: 'KomKat Studio',
   email: 'komkat.studio@gmail.com',
-  appStore: 'https://apps.apple.com/app/loggoo',
+  appStore: 'https://apps.apple.com/us/app/photo-journal-mood-loggoo/id6799161077',
   playStore: 'https://play.google.com/store/apps/details?id=me.komkatstudio.loggoo',
   legal: {
     updated: 'august 30, 2026',
