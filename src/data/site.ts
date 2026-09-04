@@ -10,7 +10,7 @@ export const site = {
   appStore: 'https://apps.apple.com/us/app/photo-journal-mood-loggoo/id6799161077',
   playStore: 'https://play.google.com/store/apps/details?id=me.komkatstudio.loggoo',
   legal: {
-    updated: 'august 30, 2026',
+    updated: 'september 5, 2026',
     effective: 'august 17, 2026'
   }
 } as const;

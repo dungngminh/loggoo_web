@@ -1,0 +1,107 @@
+end user licence agreement
+
+last updated · september 5, 2026
+
+applies to · loggoo for ios and android
+
+published at · https://loggoo.app/eula
+
+this end user licence agreement (the "licence") is the contract for the loggoo app itself — what you are allowed to do with the software. it sits alongside our terms of service (https://loggoo.app/terms), which cover the service around the app, and our privacy policy (https://loggoo.app/privacy). where this licence and the terms of service disagree about the software, this licence wins.
+
+the short version
+
+- you get a personal licence to use loggoo on devices you own. you do not own the software.
+
+- everything you log — photos, videos, notes, moods, frames — stays yours.
+
+- loggoo plus subscriptions renew automatically until you cancel in your store account.
+
+- this agreement is between you and KomKat Studio. apple is not a party to it.
+
+1 · acceptance
+
+loggoo is licensed, not sold, to you by KomKat Studio ("we", "us", "the licensor"). by downloading, installing or using loggoo you accept this licence. if you do not accept it, do not install or use the app, and delete any copy you already have.
+
+2 · scope of the licence
+
+we grant you a personal, limited, non-exclusive, non-transferable, revocable licence to install and run loggoo on apple-branded products that you own or control, or on android devices that you own or control, for your own personal, non-commercial use. on the app store, this licence is additionally governed by the usage rules in apple's media services terms and conditions, including the family sharing and device limits set out there.
+
+the licence covers the app in object-code form only. we keep all rights we do not grant here, including ownership of the loggoo software, its name, logo, mood faces, frame templates and other assets.
+
+3 · what you may not do
+
+- copy, sell, rent, lease, sublicense or redistribute the app, or make it available over a network to others.
+
+- reverse-engineer, decompile, disassemble or attempt to derive the source code, except where local law expressly permits it despite this clause.
+
+- modify or create derivative works of the app, or defeat, bypass or tamper with purchase verification or entitlement checks.
+
+- remove or obscure the loggoo watermark on a generated frame in order to pass the output off as another product's work.
+
+- use the app to store or distribute unlawful material, or material that infringes anyone else's rights.
+
+4 · your content stays yours
+
+photos, videos, notes, moods and frames you create in loggoo are yours. this licence gives us no ownership of them and no right to use them. they live on your device and, only if you switch on icloud sync, in your own icloud account. we do not run a server that holds your journal.
+
+5 · loggoo plus, billing and renewals
+
+logging is free. some features — extra frame layouts, video logs, mood face packs, mood trends and icloud sync — are part of loggoo plus. loggoo plus is offered as an auto-renewable subscription and, in some offerings, as a one-time lifetime purchase. the plans available to you, their exact price, their length and any free trial are shown on the purchase screen before you confirm, and payment is charged to your app store or google play account at confirmation.
+
+an auto-renewable subscription renews for the same period at the same price unless it is cancelled at least 24 hours before the end of the current period; the renewal is charged within the 24 hours before the period ends. you can manage or cancel a subscription in your store account settings at any time — on iphone or ipad, in settings → your name → subscriptions. deleting the app does not cancel a subscription.
+
+if a free trial is offered and you buy a subscription during it, any unused part of the trial ends at that moment. purchases are tied to the store account that made them and can be restored on that platform. payments, refunds and billing disputes are handled by apple or google under their policies, not by us — but write to us anyway if something went wrong and we will help where we can.
+
+6 · updates and changes
+
+this licence covers any update, upgrade or new version of loggoo that we make available, unless that release comes with its own licence. we may add, change or retire features, and may stop supporting older operating system versions. if we retire a paid feature, we will say so in the release notes and offer a reasonable equivalent.
+
+7 · no warranty
+
+to the fullest extent permitted by law, loggoo is provided "as is" and "as available", without warranty of any kind, whether express or implied, including implied warranties of merchantability, fitness for a particular purpose and non-infringement. we do not warrant that the app will be uninterrupted or error-free, or that your content cannot be lost. loggoo is not a medical device: it does not diagnose, treat or give clinical advice about your wellbeing. nothing here removes rights you have as a consumer under mandatory local law.
+
+8 · limitation of liability
+
+to the extent permitted by law, KomKat Studio is not liable for indirect, incidental, special or consequential damages, or for lost data or lost content, arising from your use of or inability to use loggoo. where our liability cannot be excluded, it is limited to the amount you paid for the app and its in-app purchases in the twelve months before the claim.
+
+9 · term and termination
+
+this licence runs until terminated. it ends automatically if you breach it materially — for example by attempting to circumvent purchases — and you may end it at any time by deleting the app from your devices. sections 4, 7, 8, 10 and 12 survive termination. termination does not by itself refund a purchase.
+
+10 · export and legal compliance
+
+you represent that you are not located in a country subject to a united states government embargo, or designated as a "terrorist supporting" country, and that you are not listed on any united states government list of prohibited or restricted parties. you agree to comply with all applicable local, national and international laws when you use loggoo.
+
+11 · governing law
+
+this licence is governed by the laws of the jurisdiction in which KomKat Studio is established, without affecting consumer protections that apply where you live. we will try to resolve any dispute informally by email first.
+
+12 · terms required for the apple app store
+
+the following apply when you obtained loggoo from the apple app store. they are the minimum terms apple requires, and they take precedence over anything in this licence that conflicts with them.
+
+- acknowledgement. this licence is between you and KomKat Studio only, not with apple. KomKat Studio — not apple — is solely responsible for loggoo and its content.
+
+- scope of licence. the licence granted in section 2 is non-transferable and limited to use of loggoo on apple-branded products you own or control, as permitted by the usage rules in the apple media services terms and conditions.
+
+- maintenance and support. KomKat Studio is solely responsible for any maintenance and support for loggoo. apple has no obligation to provide any maintenance or support.
+
+- warranty. KomKat Studio is solely responsible for any product warranties, whether express or implied by law, to the extent they are not effectively disclaimed. if loggoo fails to conform to any applicable warranty, you may notify apple, and apple will refund the purchase price of the app to you; to the maximum extent permitted by law, apple has no other warranty obligation whatsoever with respect to loggoo.
+
+- product claims. KomKat Studio, not apple, is responsible for addressing any claim by you or a third party relating to loggoo or your possession or use of it, including product liability claims, claims that loggoo fails to conform to a legal or regulatory requirement, and claims arising under consumer protection, privacy or similar legislation.
+
+- intellectual property rights. if a third party claims that loggoo or your possession and use of it infringes that third party's intellectual property rights, KomKat Studio, not apple, is solely responsible for the investigation, defence, settlement and discharge of that claim.
+
+- legal compliance. you make the representations set out in section 10 above.
+
+- third-party terms. you must comply with any applicable third-party terms of agreement when using loggoo — for example, your wireless data plan's terms.
+
+- third-party beneficiary. apple and apple's subsidiaries are third-party beneficiaries of this licence and, upon your acceptance of it, apple has the right (and is deemed to have accepted the right) to enforce this licence against you as a third-party beneficiary of it.
+
+13 · contact
+
+questions, complaints or claims about loggoo go to:
+
+KomKat Studio · komkat.studio@gmail.com
+
+we read everything that arrives and usually reply within two days.
