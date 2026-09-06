@@ -66,42 +66,48 @@ const locales = ['en', 'vi'] as const;
                   <a class="guide__top-link" href="#guide-top">↑ {copy.backToTop}</a>
                 </div>
 
-                <ol class="guide__steps" aria-label={section.title}>
-                  {section.steps.map((step, index) => (
-                    <li>
-                      <span class="guide__step-number" aria-hidden="true">{index + 1}</span>
-                      <div>
-                        <span class="sr-only">{copy.stepLabel} {index + 1}: </span>
-                        {step}
-                      </div>
-                    </li>
-                  ))}
-                </ol>
+                <div class="guide__section-layout">
+                  <div class="guide__instructions">
+                    <ol class="guide__steps" aria-label={section.title}>
+                      {section.steps.map((step, index) => (
+                        <li>
+                          <span class="guide__step-number" aria-hidden="true">{index + 1}</span>
+                          <div>
+                            <span class="sr-only">{copy.stepLabel} {index + 1}: </span>
+                            {step}
+                          </div>
+                        </li>
+                      ))}
+                    </ol>
 
-                {section.id === 'widgets' && (
-                  <figure class="guide__widget-demo">
-                    <div class="guide__phone">
-                      <img
-                        src="/guide/home-widget.gif"
-                        width="320"
-                        height="693"
-                        loading="lazy"
-                        decoding="async"
-                        alt={copy.widgetCaption}
-                      />
-                    </div>
-                    <figcaption>{copy.widgetCaption}</figcaption>
-                  </figure>
-                )}
+                    {section.notes && (
+                      <aside class="guide__notes">
+                        <strong>{copy.noteLabel}</strong>
+                        <ul>
+                          {section.notes.map((note) => <li>{note}</li>)}
+                        </ul>
+                      </aside>
+                    )}
+                  </div>
 
-                {section.notes && (
-                  <aside class="guide__notes">
-                    <strong>{copy.noteLabel}</strong>
-                    <ul>
-                      {section.notes.map((note) => <li>{note}</li>)}
-                    </ul>
-                  </aside>
-                )}
+                  <div class:list={['guide__media', { 'guide__media--pair': section.media.length > 1 }]}>
+                    {section.media.map((media) => (
+                      <figure class="guide__media-item">
+                        <div class="guide__screen">
+                          <img
+                            src={media.src}
+                            width={media.width}
+                            height={media.height}
+                            loading="lazy"
+                            decoding="async"
+                            alt={media.alt}
+                          />
+                        </div>
+                        <figcaption>{media.caption}</figcaption>
+                      </figure>
+                    ))}
+                  </div>
+                </div>
               </section>
             ))}
           </div>
@@ -199,7 +205,7 @@ const locales = ['en', 'vi'] as const;
   .guide__contents { display: grid; grid-template-columns: minmax(220px, .72fr) 1.4fr; gap: 40px; padding: clamp(24px, 4vw, 38px); }
   .guide__contents h2 { margin-top: 8px; font-size: 28px; }
   .guide__contents div > p:last-child { margin: 10px 0 0; color: var(--lg-on-surface-variant); }
-  .guide__contents ol { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 26px; margin: 0; padding-left: 22px; }
+  .guide__contents ol { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 26px; margin: 0; padding: 0; list-style: none; }
   .guide__contents li { color: var(--lg-on-surface-subtle); }
   .guide__contents a { display: inline-block; padding: 3px 0; color: var(--lg-on-surface-variant); font-weight: 700; }
   .guide__contents a:hover { color: var(--lg-on-primary-container); }
@@ -214,7 +220,8 @@ const locales = ['en', 'vi'] as const;
   .guide__badge { display: inline-flex; margin-bottom: 12px; padding: 5px 9px; border-radius: 9px; background: var(--lg-primary-container); color: var(--lg-on-primary-container); font-size: 11px; font-weight: 800; letter-spacing: .55px; }
   .guide__top-link { flex: none; padding: 8px 0; color: var(--lg-on-surface-subtle); font-size: 13px; font-weight: 700; }
 
-  .guide__steps { display: grid; gap: 12px; margin: 28px 0 0; padding: 0; list-style: none; }
+  .guide__section-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 320px); gap: 34px; align-items: start; margin-top: 28px; }
+  .guide__steps { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
   .guide__steps li { display: grid; grid-template-columns: 40px 1fr; gap: 14px; align-items: start; padding: 17px 20px 17px 16px; border: 1px solid var(--lg-outline-variant); border-radius: 18px; background: var(--lg-surface); color: var(--lg-on-surface-variant); line-height: 1.62; }
   .guide__step-number { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 12px; background: var(--lg-primary-container); color: var(--lg-on-primary); font: 700 15px var(--lg-font-display); }
   .guide__steps li > div { padding-top: 5px; }
@@ -224,14 +231,34 @@ const locales = ['en', 'vi'] as const;
   .guide__notes ul { margin: 8px 0 0; padding-left: 20px; }
   .guide__notes li + li { margin-top: 6px; }
 
-  .guide__widget-demo { display: grid; justify-items: center; gap: 15px; margin: 30px 0 8px; }
-  .guide__phone { width: min(100%, 382px); padding: 10px; border-radius: 39px; background: var(--lg-surface-inverse); box-shadow: 0 24px 50px -28px rgba(36, 28, 22, .7); }
-  .guide__phone img { width: 100%; border-radius: 30px; }
-  .guide__widget-demo figcaption { max-width: 540px; color: var(--lg-on-surface-subtle); font-size: 14px; line-height: 1.55; text-align: center; }
+  .guide__media { position: sticky; top: 94px; display: grid; gap: 18px; }
+  .guide__media--pair { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .guide__media-item { min-width: 0; margin: 0; }
+  .guide__screen { overflow: hidden; padding: 6px; border: 1px solid var(--lg-outline); border-radius: 32px; background: var(--lg-surface); box-shadow: 0 22px 42px -30px rgba(36, 28, 22, .8); }
+  .guide__media--pair .guide__screen { padding: 4px; border-radius: 23px; }
+  .guide__screen img { width: 100%; border-radius: 25px; }
+  .guide__media--pair .guide__screen img { border-radius: 18px; }
+  .guide__media-item figcaption { margin: 9px 4px 0; color: var(--lg-on-surface-subtle); font-size: 12.5px; line-height: 1.45; text-align: center; }
 
   .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
   [hidden] { display: none !important; }
+
+  @media (max-width: 860px) {
+    .guide__section-layout { grid-template-columns: 1fr; }
+    .guide__instructions { grid-row: 2; }
+    .guide__media {
+      position: static;
+      grid-row: 1;
+      display: flex;
+      gap: 14px;
+      overflow-x: auto;
+      padding: 4px 2px 16px;
+      scroll-snap-type: x proximity;
+    }
+    .guide__media-item { flex: 0 0 min(72vw, 290px); scroll-snap-align: start; }
+    .guide__media:not(.guide__media--pair) .guide__media-item { flex-basis: min(76vw, 320px); }
+  }
 
   @media (max-width: 720px) {
     .guide { padding-top: 34px; }
@@ -243,13 +270,14 @@ const locales = ['en', 'vi'] as const;
     .guide__section { padding-top: 52px; }
     .guide__section-heading { display: block; }
     .guide__top-link { display: inline-block; margin-top: 12px; }
+    .guide__section-layout { gap: 18px; }
   }
 
   @media (max-width: 440px) {
     .guide__steps li { grid-template-columns: 34px 1fr; gap: 10px; padding: 14px 14px 14px 12px; }
     .guide__step-number { width: 32px; height: 32px; border-radius: 10px; }
     .guide__steps li > div { padding-top: 3px; }
-    .guide__phone { width: 100%; border-radius: 30px; }
-    .guide__phone img { border-radius: 22px; }
+    .guide__screen { border-radius: 26px; }
+    .guide__screen img { border-radius: 20px; }
   }
 </style>

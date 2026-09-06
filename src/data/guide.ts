@@ -3,8 +3,17 @@ export interface GuideSection {
   title: string;
   intro: string;
   badge?: string;
+  media: GuideMedia[];
   steps: string[];
   notes?: string[];
+}
+
+export interface GuideMedia {
+  src: string;
+  width: number;
+  height: number;
+  alt: string;
+  caption: string;
 }
 
 export interface GuideCopy {
@@ -17,7 +26,6 @@ export interface GuideCopy {
   contentsHint: string;
   stepLabel: string;
   noteLabel: string;
-  widgetCaption: string;
   backToTop: string;
   sections: GuideSection[];
 }
@@ -33,13 +41,17 @@ export const guide: Record<'en' | 'vi', GuideCopy> = {
     contentsHint: 'Start at the beginning or jump straight to what you need.',
     stepLabel: 'Step',
     noteLabel: 'Good to know',
-    widgetCaption: 'Add a Loggoo widget, browse the Day, Mood, and Streak styles, then use its shortcuts to open the app.',
     backToTop: 'Back to top',
     sections: [
       {
         id: 'getting-started',
         title: '1. Get started',
         intro: 'The three-page welcome introduces moods, the daily timeline, and frames. It appears only on your first launch unless you choose to replay it later.',
+        media: [{
+          src: '/guide/screens/onboarding-mood.png', width: 1080, height: 2340,
+          alt: 'Loggoo welcome screen asking how you feel today with five mood choices.',
+          caption: 'The welcome starts with an optional mood preview.'
+        }],
         steps: [
           'Open Loggoo and answer “how do you feel about today?” if you want to preview a mood. This choice does not add anything to your journal.',
           'Tap “continue” or swipe to learn how moments collect into one day.',
@@ -53,6 +65,18 @@ export const guide: Record<'en' | 'vi', GuideCopy> = {
         title: '2. Capture a photo or video',
         intro: 'The camera is the fastest way to add a moment. Photos are available to everyone; short video capture requires Loggoo Plus and supported hardware.',
         badge: 'VIDEO · LOGGOO PLUS',
+        media: [
+          {
+            src: '/screens/compose.png', width: 491, height: 1024,
+            alt: 'A captured landscape photo in the Loggoo moment composer with mood choices.',
+            caption: 'Review a photo, add a mood, and send it to today.'
+          },
+          {
+            src: '/screens/note-sheet.png', width: 491, height: 1024,
+            alt: 'A short video clip in the Loggoo composer with playback, trim, mute, and mood controls.',
+            caption: 'Plus video clips can be reviewed before they are saved.'
+          }
+        ],
         steps: [
           'From Home, tap the camera button or “take a photo”. Allow camera access when iOS asks.',
           'Tap the preview to focus, pinch to zoom, use the flash control, or switch between the front and back cameras.',
@@ -70,6 +94,11 @@ export const guide: Record<'en' | 'vi', GuideCopy> = {
         id: 'moods-notes',
         title: '3. Add a mood or note',
         intro: 'A day does not need a photo. A mood or one sentence is enough to keep it from disappearing.',
+        media: [{
+          src: '/guide/screens/mood-note.png', width: 1080, height: 2340,
+          alt: 'The Loggoo note sheet open over an earlier day with a text field and mood choices.',
+          caption: 'Write one sentence and add a mood to today or an earlier day.'
+        }],
         steps: [
           'On Home, tap the mood button or “log a mood”.',
           'Choose the face that fits: radiant, happy, calm, normal, down, or off. Loggoo adds it to the selected day immediately.',
@@ -83,6 +112,11 @@ export const guide: Record<'en' | 'vi', GuideCopy> = {
         id: 'timeline',
         title: '4. Browse and edit your timeline',
         intro: 'Every photo, video, mood, and note appears in time order on the day timeline.',
+        media: [{
+          src: '/screens/timeline.png', width: 491, height: 1024,
+          alt: 'Loggoo day timeline with a framed photo, caption, mood entry, and action buttons.',
+          caption: 'Your moments stay in time order on one daily timeline.'
+        }],
         steps: [
           'Tap a photo or video card to open its detail view. Play or mute a video from its controls.',
           'In detail view, tap “save” to copy a photo to Apple Photos, or tap “frame this day” to open Frame Studio.',
@@ -97,6 +131,11 @@ export const guide: Record<'en' | 'vi', GuideCopy> = {
         id: 'calendar',
         title: '5. Move between days and months',
         intro: 'Use the date controls to revisit earlier days or understand your month at a glance.',
+        media: [{
+          src: '/guide/screens/month-view.png', width: 1080, height: 2340,
+          alt: 'Loggoo month calendar showing mood faces, a twelve-day streak, and monthly totals.',
+          caption: 'The month view shows logged days, moods, and your current streak.'
+        }],
         steps: [
           'In day view, tap the left or right arrow beside the date to move one day at a time.',
           'Switch from “day” to “month” to open the calendar.',
@@ -111,6 +150,18 @@ export const guide: Record<'en' | 'vi', GuideCopy> = {
         title: '6. Make and share a frame',
         intro: 'Frame Studio turns one day into a single image for Stories, posts, or your photo library.',
         badge: 'SOME LAYOUTS · LOGGOO PLUS',
+        media: [
+          {
+            src: '/screens/frame-polaroid.png', width: 491, height: 1024,
+            alt: 'Loggoo Frame Studio showing the Polaroid layout, aspect switch, photo and mood controls, and save and share buttons.',
+            caption: 'Choose the aspect, photos, mood, and layout in Frame Studio.'
+          },
+          {
+            src: '/guide/screens/frame-collage.png', width: 720, height: 1280,
+            alt: 'A finished vertical Loggoo collage frame made from a day of photos and moods.',
+            caption: 'A finished 9:16 frame is ready for Stories.'
+          }
+        ],
         steps: [
           'Open a day with at least one photo, then tap “frame your day”. You can also use “frame this day” from a moment.',
           'Choose 9:16 for a Story or 4:5 for a post.',
@@ -126,6 +177,18 @@ export const guide: Record<'en' | 'vi', GuideCopy> = {
         title: '7. View Mood Trends and Recap',
         intro: 'Trends explains patterns in your moods. Recap plays your journal back as a private, on-device story.',
         badge: 'MOOD TRENDS · LOGGOO PLUS',
+        media: [
+          {
+            src: '/screens/mood-sheet.png', width: 491, height: 1024,
+            alt: 'Loggoo Mood Trends showing the average mood, mood over time, and mood distribution for a week.',
+            caption: 'Mood Trends turns your check-ins into a readable weekly view.'
+          },
+          {
+            src: '/guide/screens/recap-setup.png', width: 1080, height: 2340,
+            alt: 'Loggoo Recap setup with week, month, and year windows and story length choices.',
+            caption: 'Choose a window and length before playing your Recap.'
+          }
+        ],
         steps: [
           'Tap the chart button on Home to open “mood trends”. Switch between week and month.',
           'Review your average mood, change from the previous period, mood split, memorable days, observations, and suggested next step.',
@@ -144,6 +207,11 @@ export const guide: Record<'en' | 'vi', GuideCopy> = {
         title: '8. Add a Home Screen Widget',
         intro: 'Loggoo has Day, Mood, and Streak widgets. They show your latest journal snapshot and open the app when you tap an action.',
         badge: 'LOGGOO PLUS',
+        media: [{
+          src: '/guide/home-widget.gif', width: 320, height: 693,
+          alt: 'Recording of adding a Loggoo widget, browsing Day, Mood, and Streak styles, and opening the app from a widget action.',
+          caption: 'Add a widget, choose a style and size, then use its shortcuts.'
+        }],
         steps: [
           'Touch and hold an empty area of the iPhone Home Screen until the apps begin to move.',
           'Tap “Edit”, then “Add Widget”. On some iOS versions, tap the plus button instead.',
@@ -161,6 +229,11 @@ export const guide: Record<'en' | 'vi', GuideCopy> = {
         id: 'reminders',
         title: '9. Set a daily reminder',
         intro: 'Choose one gentle daily check-in time. Loggoo may also remind you about an empty evening or an older memory when notifications are enabled.',
+        media: [{
+          src: '/guide/screens/reminder-nudge.png', width: 1080, height: 2340,
+          alt: 'Loggoo reminder prompt asking whether to set one daily nudge.',
+          caption: 'Choose the hour when Loggoo first offers a daily reminder.'
+        }],
         steps: [
           'Tap the gear on Home to open Settings.',
           'Turn on “notifications” if you want Loggoo to mention an evening that is still empty or a memory from this day in an earlier month or year.',
@@ -176,6 +249,11 @@ export const guide: Record<'en' | 'vi', GuideCopy> = {
         title: '10. Personalize Loggoo',
         intro: 'Settings controls how the journal looks, feels, and labels time throughout the app.',
         badge: 'SOME OPTIONS · LOGGOO PLUS',
+        media: [{
+          src: '/guide/screens/settings.png', width: 1080, height: 2340,
+          alt: 'Loggoo Settings showing the album, Plus, streak, notifications, daily reminder, mood faces, and default frame.',
+          caption: 'Settings keeps daily controls and appearance choices together.'
+        }],
         steps: [
           'Tap the gear on Home to open Settings, then tap the album card to rename “my loggoo”. This name appears on frames and exports.',
           'Tap “mood faces” to preview all 15 packs. Classic is free; the other packs require Plus and update faces and mood colors across the app and widgets.',
@@ -192,6 +270,18 @@ export const guide: Record<'en' | 'vi', GuideCopy> = {
         title: '11. iCloud sync and Loggoo Plus',
         intro: 'Plus unlocks video logging, premium frames and mood packs, Mood Trends, widgets, and iCloud sync.',
         badge: 'LOGGOO PLUS',
+        media: [
+          {
+            src: '/guide/screens/icloud-sync.png', width: 1080, height: 2340,
+            alt: 'Loggoo Settings with the iCloud sync option enabled and its status visible.',
+            caption: 'Turn on iCloud sync from Settings and check its live status.'
+          },
+          {
+            src: '/guide/screens/loggoo-plus.png', width: 1080, height: 2340,
+            alt: 'Loggoo Plus plan screen with benefits, plan choices, purchase action, and restore button.',
+            caption: 'The Plus screen always shows the current App Store plans and restore action.'
+          }
+        ],
         steps: [
           'Tap the “loggoo plus” card in Settings to view the plans available for your App Store account.',
           'Choose a plan and follow the App Store purchase sheet. Prices and renewal terms shown there come from Apple.',
@@ -209,6 +299,11 @@ export const guide: Record<'en' | 'vi', GuideCopy> = {
         id: 'troubleshooting',
         title: '12. Troubleshooting and privacy',
         intro: 'Most problems come from an iOS permission, a missing local media file, or a store/iCloud connection.',
+        media: [{
+          src: '/guide/screens/camera-permission.png', width: 1080, height: 2340,
+          alt: 'Loggoo camera access screen explaining that permission was denied and offering an Allow camera button.',
+          caption: 'Permission screens explain what Loggoo needs and how to try again.'
+        }],
         steps: [
           'Camera unavailable: open iOS Settings › Apps › Loggoo › Camera and enable access, then return and tap “Retry camera”.',
           'Cannot choose or save photos: check Loggoo’s Photos permission in iOS Settings and try again.',
@@ -235,13 +330,17 @@ export const guide: Record<'en' | 'vi', GuideCopy> = {
     contentsHint: 'Bắt đầu từ đầu hoặc chuyển thẳng đến mục bạn cần.',
     stepLabel: 'Bước',
     noteLabel: 'Thông tin hữu ích',
-    widgetCaption: 'Thêm widget Loggoo, xem các kiểu Day, Mood và Streak, sau đó dùng phím tắt để mở đúng chức năng trong app.',
     backToTop: 'Về đầu trang',
     sections: [
       {
         id: 'getting-started',
         title: '1. Bắt đầu sử dụng',
         intro: 'Ba trang chào mừng giới thiệu tâm trạng, timeline hằng ngày và frame. Phần này chỉ xuất hiện ở lần mở đầu tiên, trừ khi bạn chọn xem lại sau đó.',
+        media: [{
+          src: '/guide/screens/onboarding-mood.png', width: 1080, height: 2340,
+          alt: 'Màn hình chào mừng của Loggoo hỏi cảm xúc hôm nay với năm lựa chọn tâm trạng.',
+          caption: 'Phần chào mừng bắt đầu bằng lựa chọn tâm trạng không bắt buộc.'
+        }],
         steps: [
           'Mở Loggoo và trả lời “how do you feel about today?” nếu bạn muốn xem thử một tâm trạng. Lựa chọn này không thêm dữ liệu vào nhật ký.',
           'Nhấn “continue” hoặc vuốt để xem cách các khoảnh khắc được gom lại theo từng ngày.',
@@ -255,6 +354,18 @@ export const guide: Record<'en' | 'vi', GuideCopy> = {
         title: '2. Chụp ảnh hoặc quay video',
         intro: 'Camera là cách nhanh nhất để thêm một khoảnh khắc. Mọi người đều có thể chụp ảnh; quay video ngắn cần Loggoo Plus và thiết bị được hỗ trợ.',
         badge: 'VIDEO · LOGGOO PLUS',
+        media: [
+          {
+            src: '/screens/compose.png', width: 491, height: 1024,
+            alt: 'Ảnh phong cảnh đã chụp trong màn hình soạn khoảnh khắc Loggoo cùng các lựa chọn tâm trạng.',
+            caption: 'Kiểm tra ảnh, thêm tâm trạng rồi gửi vào nhật ký hôm nay.'
+          },
+          {
+            src: '/screens/note-sheet.png', width: 491, height: 1024,
+            alt: 'Video ngắn trong màn hình Loggoo với nút phát, cắt, tắt tiếng và chọn tâm trạng.',
+            caption: 'Video Plus có thể được xem lại trước khi lưu.'
+          }
+        ],
         steps: [
           'Từ Home, nhấn nút camera hoặc “take a photo”. Cho phép truy cập camera khi iOS hỏi.',
           'Chạm vào khung xem trước để lấy nét, chụm hai ngón để zoom, chỉnh flash hoặc đổi camera trước/sau.',
@@ -272,6 +383,11 @@ export const guide: Record<'en' | 'vi', GuideCopy> = {
         id: 'moods-notes',
         title: '3. Thêm tâm trạng hoặc ghi chú',
         intro: 'Một ngày không nhất thiết phải có ảnh. Chỉ một tâm trạng hoặc một câu cũng đủ để lưu lại ngày đó.',
+        media: [{
+          src: '/guide/screens/mood-note.png', width: 1080, height: 2340,
+          alt: 'Bảng ghi chú Loggoo mở trên một ngày cũ với ô nhập chữ và các lựa chọn tâm trạng.',
+          caption: 'Viết một câu và thêm tâm trạng vào hôm nay hoặc ngày cũ.'
+        }],
         steps: [
           'Tại Home, nhấn nút mood hoặc “log a mood”.',
           'Chọn gương mặt phù hợp: radiant, happy, calm, normal, down hoặc off. Loggoo sẽ thêm tâm trạng ngay vào ngày đang xem.',
@@ -285,6 +401,11 @@ export const guide: Record<'en' | 'vi', GuideCopy> = {
         id: 'timeline',
         title: '4. Xem và chỉnh sửa timeline',
         intro: 'Mọi ảnh, video, tâm trạng và ghi chú được sắp theo thời gian trên timeline của ngày.',
+        media: [{
+          src: '/screens/timeline.png', width: 491, height: 1024,
+          alt: 'Timeline ngày của Loggoo với ảnh, chú thích, tâm trạng và các nút hành động.',
+          caption: 'Các khoảnh khắc được xếp theo thời gian trên một timeline hằng ngày.'
+        }],
         steps: [
           'Chạm vào thẻ ảnh hoặc video để mở trang chi tiết. Dùng các nút điều khiển để phát hoặc tắt tiếng video.',
           'Trong trang chi tiết, nhấn “save” để lưu ảnh vào Apple Photos hoặc “frame this day” để mở Frame Studio.',
@@ -299,6 +420,11 @@ export const guide: Record<'en' | 'vi', GuideCopy> = {
         id: 'calendar',
         title: '5. Chuyển ngày và tháng',
         intro: 'Dùng các nút ngày để xem lại nhật ký cũ hoặc quan sát cả tháng.',
+        media: [{
+          src: '/guide/screens/month-view.png', width: 1080, height: 2340,
+          alt: 'Lịch tháng Loggoo hiển thị gương mặt tâm trạng, streak mười hai ngày và thống kê tháng.',
+          caption: 'Chế độ month cho biết ngày đã ghi, tâm trạng và streak hiện tại.'
+        }],
         steps: [
           'Trong chế độ day, nhấn mũi tên trái hoặc phải cạnh ngày để di chuyển từng ngày.',
           'Chuyển từ “day” sang “month” để mở lịch.',
@@ -313,6 +439,18 @@ export const guide: Record<'en' | 'vi', GuideCopy> = {
         title: '6. Tạo và chia sẻ frame',
         intro: 'Frame Studio biến một ngày thành một ảnh duy nhất để đăng Story, bài viết hoặc lưu vào thư viện.',
         badge: 'MỘT SỐ LAYOUT · LOGGOO PLUS',
+        media: [
+          {
+            src: '/screens/frame-polaroid.png', width: 491, height: 1024,
+            alt: 'Frame Studio của Loggoo với layout Polaroid, lựa chọn tỷ lệ, ảnh, tâm trạng cùng nút lưu và chia sẻ.',
+            caption: 'Chọn tỷ lệ, ảnh, tâm trạng và layout trong Frame Studio.'
+          },
+          {
+            src: '/guide/screens/frame-collage.png', width: 720, height: 1280,
+            alt: 'Một frame collage dọc hoàn chỉnh được Loggoo tạo từ ảnh và tâm trạng trong ngày.',
+            caption: 'Frame 9:16 hoàn chỉnh đã sẵn sàng để đăng Story.'
+          }
+        ],
         steps: [
           'Mở ngày có ít nhất một ảnh rồi nhấn “frame your day”. Bạn cũng có thể chọn “frame this day” từ một khoảnh khắc.',
           'Chọn 9:16 cho Story hoặc 4:5 cho bài đăng.',
@@ -328,6 +466,18 @@ export const guide: Record<'en' | 'vi', GuideCopy> = {
         title: '7. Xem Mood Trends và Recap',
         intro: 'Mood Trends giúp bạn hiểu các mẫu tâm trạng. Recap phát lại nhật ký dưới dạng story riêng tư ngay trên thiết bị.',
         badge: 'MOOD TRENDS · LOGGOO PLUS',
+        media: [
+          {
+            src: '/screens/mood-sheet.png', width: 491, height: 1024,
+            alt: 'Mood Trends của Loggoo hiển thị tâm trạng trung bình, diễn biến và tỷ lệ tâm trạng trong tuần.',
+            caption: 'Mood Trends biến các lần check-in thành tổng kết tuần dễ đọc.'
+          },
+          {
+            src: '/guide/screens/recap-setup.png', width: 1080, height: 2340,
+            alt: 'Màn hình thiết lập Recap với lựa chọn tuần, tháng, năm và thời lượng story.',
+            caption: 'Chọn khoảng thời gian và độ dài trước khi phát Recap.'
+          }
+        ],
         steps: [
           'Nhấn nút biểu đồ trên Home để mở “mood trends”. Chuyển giữa week và month.',
           'Xem tâm trạng trung bình, thay đổi so với kỳ trước, tỷ lệ tâm trạng, ngày đáng nhớ, nhận xét và gợi ý tiếp theo.',
@@ -346,6 +496,11 @@ export const guide: Record<'en' | 'vi', GuideCopy> = {
         title: '8. Thêm Home Screen Widget',
         intro: 'Loggoo có ba widget Day, Mood và Streak. Widget hiển thị bản chụp nhật ký mới nhất và mở app khi bạn chạm một hành động.',
         badge: 'LOGGOO PLUS',
+        media: [{
+          src: '/guide/home-widget.gif', width: 320, height: 693,
+          alt: 'Video thêm widget Loggoo, xem các kiểu Day, Mood, Streak và mở app từ hành động trên widget.',
+          caption: 'Thêm widget, chọn kiểu và kích thước rồi dùng các phím tắt.'
+        }],
         steps: [
           'Nhấn giữ vùng trống trên Home Screen của iPhone cho đến khi các ứng dụng rung.',
           'Nhấn “Edit”, sau đó chọn “Add Widget”. Trên một số phiên bản iOS, hãy nhấn nút dấu cộng.',
@@ -363,6 +518,11 @@ export const guide: Record<'en' | 'vi', GuideCopy> = {
         id: 'reminders',
         title: '9. Đặt nhắc nhở hằng ngày',
         intro: 'Chọn một giờ check-in nhẹ nhàng mỗi ngày. Khi bật thông báo, Loggoo cũng có thể nhắc về buổi tối còn trống hoặc một kỷ niệm cũ.',
+        media: [{
+          src: '/guide/screens/reminder-nudge.png', width: 1080, height: 2340,
+          alt: 'Bảng nhắc nhở Loggoo hỏi người dùng có muốn đặt một lời nhắc mỗi ngày không.',
+          caption: 'Chọn giờ khi Loggoo đề nghị đặt lời nhắc hằng ngày lần đầu.'
+        }],
         steps: [
           'Nhấn biểu tượng bánh răng trên Home để mở Settings.',
           'Bật “notifications” nếu bạn muốn Loggoo nhắc khi buổi tối vẫn chưa có nội dung hoặc gợi lại kỷ niệm cùng ngày ở tháng/năm trước.',
@@ -378,6 +538,11 @@ export const guide: Record<'en' | 'vi', GuideCopy> = {
         title: '10. Cá nhân hoá Loggoo',
         intro: 'Settings điều khiển giao diện, phản hồi và cách hiển thị thời gian trên toàn ứng dụng.',
         badge: 'MỘT SỐ TUỲ CHỌN · LOGGOO PLUS',
+        media: [{
+          src: '/guide/screens/settings.png', width: 1080, height: 2340,
+          alt: 'Settings của Loggoo với album, Plus, streak, thông báo, lời nhắc, mood faces và default frame.',
+          caption: 'Settings tập hợp cài đặt hằng ngày và tuỳ chọn giao diện.'
+        }],
         steps: [
           'Nhấn biểu tượng bánh răng trên Home để mở Settings, sau đó nhấn thẻ album để đổi tên “my loggoo”. Tên này xuất hiện trên frame và ảnh xuất.',
           'Nhấn “mood faces” để xem 15 bộ gương mặt. Classic miễn phí; các bộ còn lại cần Plus và thay đổi gương mặt, màu tâm trạng trong app lẫn widget.',
@@ -394,6 +559,18 @@ export const guide: Record<'en' | 'vi', GuideCopy> = {
         title: '11. Đồng bộ iCloud và Loggoo Plus',
         intro: 'Plus mở khoá quay video, frame và mood pack cao cấp, Mood Trends, widget và đồng bộ iCloud.',
         badge: 'LOGGOO PLUS',
+        media: [
+          {
+            src: '/guide/screens/icloud-sync.png', width: 1080, height: 2340,
+            alt: 'Settings của Loggoo với đồng bộ iCloud đang bật và trạng thái được hiển thị.',
+            caption: 'Bật iCloud sync trong Settings và kiểm tra trạng thái trực tiếp.'
+          },
+          {
+            src: '/guide/screens/loggoo-plus.png', width: 1080, height: 2340,
+            alt: 'Màn hình gói Loggoo Plus với quyền lợi, lựa chọn gói, nút mua và khôi phục.',
+            caption: 'Màn hình Plus luôn hiển thị các gói App Store hiện tại và nút restore.'
+          }
+        ],
         steps: [
           'Nhấn thẻ “loggoo plus” trong Settings để xem các gói dành cho tài khoản App Store của bạn.',
           'Chọn gói và làm theo bảng thanh toán của App Store. Giá và điều khoản gia hạn hiển thị tại đó do Apple cung cấp.',
@@ -411,6 +588,11 @@ export const guide: Record<'en' | 'vi', GuideCopy> = {
         id: 'troubleshooting',
         title: '12. Xử lý sự cố và quyền riêng tư',
         intro: 'Phần lớn sự cố đến từ quyền iOS, file media cục bộ bị thiếu hoặc kết nối với App Store/iCloud.',
+        media: [{
+          src: '/guide/screens/camera-permission.png', width: 1080, height: 2340,
+          alt: 'Màn hình quyền camera của Loggoo thông báo quyền bị từ chối và có nút Allow camera.',
+          caption: 'Màn hình quyền giải thích Loggoo cần gì và cách thử lại.'
+        }],
         steps: [
           'Không mở được camera: vào iOS Settings › Apps › Loggoo › Camera và bật quyền, sau đó quay lại nhấn “Retry camera”.',
           'Không chọn hoặc lưu được ảnh: kiểm tra quyền Photos của Loggoo trong iOS Settings rồi thử lại.',
