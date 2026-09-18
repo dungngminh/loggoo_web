@@ -1,6 +1,7 @@
 import {
   IMAGE_ACCEPT,
   type Aspect,
+  type Layer,
   type MoodPlacement,
   type Slot,
   type TextBind,
@@ -11,12 +12,28 @@ import {
   slugFromName,
   zipStore,
 } from './frame-pack'
+import { clearDraft, loadDraft, saveDraft } from './frame-draft'
 
 type Handle = 'nw' | 'ne' | 'sw' | 'se'
 
 type DraftSlot = Slot & { id: string }
 type DraftText = TextBind & { id: string }
-type Layout = { slots: DraftSlot[]; texts: DraftText[]; mood?: MoodPlacement }
+/** `layers` is the paint order, bottom to top: 'overlay', 'mood', or a slot id. */
+type Layout = { slots: DraftSlot[]; texts: DraftText[]; mood?: MoodPlacement; layers: string[] }
+type Mode = 'select' | 'draw'
+
+/** What undo/redo and the saved draft carry. Files are immutable, so snapshots share them by reference. */
+type Snapshot = { layouts: string; overlays: Record<Aspect, File | null> }
+type Draft = {
+  nameEn: string
+  nameVi: string
+  premium: boolean
+  aspect: Aspect
+  layouts: Record<Aspect, Layout>
+  overlays: Record<Aspect, File | null>
+  icon: File | null
+  savedAt: number
+}
 
 type PointerMode =
   | { kind: 'move'; id: string; startX: number; startY: number; originX: number; originY: number }
@@ -35,6 +52,13 @@ const FRAME_WIDTH_DP = 360
 const ASPECT_HEIGHT_DP: Record<Aspect, number> = { story: 640, post: 450 }
 const MIN_MOOD_SIZE_DP = 16
 const MAX_MOOD_SIZE_DP = 180
+const HISTORY_LIMIT = 100
+/** Rail tile is 40dp; 256px covers 3x screens with room for the ring. Below 128px it visibly blurs. */
+const ICON_MIN_PX = 128
+const ICON_RECOMMENDED_PX = 256
+const ZOOM_STEP = 1.25
+const ZOOM_MIN = 0.5
+const ZOOM_MAX = 4
 
 const FILLS = ['#F6B393', '#9BD9B8', '#A9D6EE', '#F6E3A3', '#F3C3CB', '#E8804F']
 function uid(): string {
@@ -103,7 +127,7 @@ export function mountStudio(root: HTMLElement): void {
   const slotLayer = $('[data-slots]', root)
   const moodLayer = $('[data-mood-layer]', root)
   const rubber = $('[data-rubber]', root)
-  const list = $('[data-slot-list]', root)
+  const list = $('[data-layer-list]', root)
   const inspector = $('[data-inspector]', root)
   const snippet = $('[data-snippet]', root) as HTMLTextAreaElement
   const status = $('[data-status]', root)
@@ -112,22 +136,142 @@ export function mountStudio(root: HTMLElement): void {
   const addMoodButton = $('[data-add-mood]', root) as HTMLButtonElement
   const deleteMoodButton = $('[data-delete-mood]', root) as HTMLButtonElement
   const moodStatus = $('[data-mood-status]', root)
+  const removeOverlayButton = $('[data-remove-overlay]', root) as HTMLButtonElement
 
   const overlays: Record<Aspect, File | null> = { story: null, post: null }
-  const overlayUrl: Record<Aspect, string | null> = { story: null, post: null }
+  // Object URLs live as long as the page: history and the draft keep old Files reachable anyway.
+  const objectUrls = new Map<File, string>()
   const layouts: Record<Aspect, Layout> = {
-    story: { slots: [], texts: [] },
-    post: { slots: [], texts: [] },
+    story: { slots: [], texts: [], layers: ['overlay'] },
+    post: { slots: [], texts: [], layers: ['overlay'] },
   }
+  const history: Snapshot[] = []
+  let historyIndex = -1
+  let zoom = 1
+  let saveTimer: number | undefined
 
   let aspect: Aspect = 'story'
+  let mode: Mode = 'select'
   let selectedId: string | null = null
   let moodSelected = false
+  let frameSelected = false
   let pointer: PointerMode | null = null
   let iconFile: File | null = null
 
   function layout(): Layout {
     return layouts[aspect]
+  }
+
+  function overlayUrlFor(which: Aspect): string | null {
+    const file = overlays[which]
+    if (!file) return null
+    let url = objectUrls.get(file)
+    if (!url) {
+      url = URL.createObjectURL(file)
+      objectUrls.set(file, url)
+    }
+    return url
+  }
+
+  function snapshot(): Snapshot {
+    return { layouts: JSON.stringify(layouts), overlays: { ...overlays } }
+  }
+
+  function sameSnapshot(a: Snapshot, b: Snapshot): boolean {
+    return a.layouts === b.layouts && a.overlays.story === b.overlays.story && a.overlays.post === b.overlays.post
+  }
+
+  /** Record the current state as an undo step. No-op when nothing changed since the last step. */
+  function commit(): void {
+    const next = snapshot()
+    if (historyIndex >= 0 && sameSnapshot(history[historyIndex], next)) return
+    history.splice(historyIndex + 1)
+    history.push(next)
+    if (history.length > HISTORY_LIMIT) history.shift()
+    historyIndex = history.length - 1
+  }
+
+  function resetHistory(): void {
+    history.length = 0
+    historyIndex = -1
+    commit()
+  }
+
+  function restore(step: Snapshot): void {
+    const parsed = JSON.parse(step.layouts) as Record<Aspect, Layout>
+    layouts.story = parsed.story
+    layouts.post = parsed.post
+    overlays.story = step.overlays.story
+    overlays.post = step.overlays.post
+    clearSelection()
+    renderOverlay()
+    renderSlots()
+  }
+
+  function undo(): void {
+    if (historyIndex <= 0) return
+    historyIndex--
+    restore(history[historyIndex])
+    setStatus('undo')
+  }
+
+  function redo(): void {
+    if (historyIndex >= history.length - 1) return
+    historyIndex++
+    restore(history[historyIndex])
+    setStatus('redo')
+  }
+
+  function setZoom(next: number): void {
+    zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, next))
+    frame.style.setProperty('--zoom', String(zoom))
+    $('[data-zoom]', root).textContent = `${Math.round(zoom * 100)}%`
+  }
+
+  function scheduleSave(): void {
+    window.clearTimeout(saveTimer)
+    saveTimer = window.setTimeout(() => {
+      const draft: Draft = {
+        nameEn: input('[name="nameEn"]', root).value,
+        nameVi: input('[name="nameVi"]', root).value,
+        premium: input('[name="premium"]', root).checked,
+        aspect,
+        layouts: JSON.parse(JSON.stringify(layouts)) as Record<Aspect, Layout>,
+        overlays: { ...overlays },
+        icon: iconFile,
+        savedAt: Date.now(),
+      }
+      void saveDraft(draft)
+    }, 400)
+  }
+
+  /** Inline z-index: 10 + stack position; the selected layer lifts above everything so its handles stay reachable. */
+  function layerZ(id: string, isSelected: boolean): string {
+    return isSelected ? '100' : String(10 + layout().layers.indexOf(id))
+  }
+
+  function selectedLayer(): string | null {
+    if (selectedId) return selectedId
+    if (moodSelected) return 'mood'
+    if (frameSelected) return 'overlay'
+    return null
+  }
+
+  function clearSelection(): void {
+    selectedId = null
+    moodSelected = false
+    frameSelected = false
+  }
+
+  function moveLayer(id: string, delta: 1 | -1): void {
+    const layers = layout().layers
+    const from = layers.indexOf(id)
+    const to = from + delta
+    if (from < 0 || to < 0 || to >= layers.length) return
+    layers.splice(from, 1)
+    layers.splice(to, 0, id)
+    commit()
+    renderSlots()
   }
 
   function selected(): DraftSlot | undefined {
@@ -238,6 +382,7 @@ export function mountStudio(root: HTMLElement): void {
     el.style.width = `${slot.w * 100}%`
     el.style.height = `${slot.h * 100}%`
     el.style.transform = `rotate(${slot.rotation}deg)`
+    el.style.zIndex = layerZ(slot.id, slot.id === selectedId)
     el.style.setProperty('--fill', FILLS[slot.photo % FILLS.length])
     el.style.setProperty('--corner', `${slot.cornerDp}`)
     const label = el.querySelector('.slot__label')
@@ -252,6 +397,7 @@ export function mountStudio(root: HTMLElement): void {
     el.style.top = `${mood.y * 100}%`
     el.style.width = `${(mood.sizeDp / FRAME_WIDTH_DP) * 100}%`
     el.style.transform = `rotate(${mood.rotation}deg)`
+    el.style.zIndex = layerZ('mood', moodSelected)
     const meta = el.querySelector('.mood-face__meta')
     if (meta) meta.textContent = `${Math.round(mood.rotation)}° · ${Math.round(mood.sizeDp)}dp`
   }
@@ -277,12 +423,22 @@ export function mountStudio(root: HTMLElement): void {
 
   function paintSelection(): void {
     for (const node of slotLayer.children) {
-      if (node instanceof HTMLElement) {
-        node.classList.toggle('is-selected', node.dataset.slotId === selectedId)
+      if (node instanceof HTMLElement && node.dataset.slotId) {
+        const isSelected = node.dataset.slotId === selectedId
+        node.classList.toggle('is-selected', isSelected)
+        node.style.zIndex = layerZ(node.dataset.slotId, isSelected)
       }
     }
     const mood = moodLayer.querySelector('[data-mood]')
-    if (mood instanceof HTMLElement) mood.classList.toggle('is-selected', moodSelected)
+    if (mood instanceof HTMLElement) {
+      mood.classList.toggle('is-selected', moodSelected)
+      mood.style.zIndex = layerZ('mood', moodSelected)
+    }
+    frame.classList.toggle('is-frame-selected', frameSelected)
+    overlayImg.style.zIndex = layerZ('overlay', frameSelected)
+    for (const row of list.querySelectorAll<HTMLElement>('[data-layer]')) {
+      row.classList.toggle('is-selected', row.dataset.layer === selectedLayer())
+    }
   }
 
   function renderMood(): void {
@@ -334,23 +490,51 @@ export function mountStudio(root: HTMLElement): void {
       slotLayer.append(el)
     }
 
-    list.replaceChildren()
-    if (slots.length === 0) {
-      const empty = document.createElement('p')
-      empty.className = 'studio__hint'
-      empty.textContent = 'no slots yet — drag on the canvas or add one'
-      list.append(empty)
-    }
-    for (const slot of slots) {
-      const row = document.createElement('button')
-      row.type = 'button'
-      row.className = 'slot-row' + (slot.id === selectedId ? ' is-selected' : '')
-      row.dataset.slotId = slot.id
-      row.innerHTML = `<span>photo ${slot.photo + 1}</span><span>${Math.round(slot.w * 100)}×${Math.round(slot.h * 100)}</span>`
-      list.append(row)
-    }
+    renderLayers()
     renderInspector()
     renderMood()
+    scheduleSave()
+  }
+
+  function renderLayers(): void {
+    list.replaceChildren()
+    const layers = layout().layers
+    const top = layers.length - 1
+    // Photoshop order: top of the stack is the first row.
+    for (let i = top; i >= 0; i--) {
+      const id = layers[i]
+      const row = document.createElement('div')
+      row.className = 'layer-row'
+      row.dataset.layer = id
+      row.setAttribute('role', 'button')
+      row.tabIndex = 0
+      let name = ''
+      let swatch = ''
+      if (id === 'overlay') {
+        name = overlays[aspect] ? 'frame overlay' : 'frame overlay · none yet'
+        row.classList.toggle('is-missing', overlays[aspect] == null)
+      } else if (id === 'mood') {
+        name = 'mood face'
+        swatch = 'var(--lg-primary)'
+      } else {
+        const slot = layout().slots.find((item) => item.id === id)
+        if (!slot) continue
+        name = `photo ${slot.photo + 1} · ${Math.round(slot.w * 100)}×${Math.round(slot.h * 100)}`
+        swatch = FILLS[slot.photo % FILLS.length]
+      }
+      row.classList.toggle('is-selected', id === selectedLayer())
+      row.innerHTML = `
+        <span class="layer-row__swatch"></span>
+        <span class="layer-row__name"></span>
+        <span class="layer-row__tools">
+          <button type="button" data-layer-up aria-label="bring forward" ${i === top ? 'disabled' : ''}>▲</button>
+          <button type="button" data-layer-down aria-label="send backward" ${i === 0 ? 'disabled' : ''}>▼</button>
+        </span>
+      `
+      $('.layer-row__name', row).textContent = name
+      if (swatch) row.style.setProperty('--swatch', swatch)
+      list.append(row)
+    }
   }
 
   function renderInspector(): void {
@@ -361,7 +545,7 @@ export function mountStudio(root: HTMLElement): void {
   }
 
   function renderOverlay(): void {
-    const url = overlayUrl[aspect]
+    const url = overlayUrlFor(aspect)
     frame.dataset.aspect = aspect
     frame.classList.toggle('has-overlay', url != null)
     if (url) {
@@ -375,19 +559,34 @@ export function mountStudio(root: HTMLElement): void {
     $('[data-overlay-empty]', root).textContent =
       url != null ? '' : `upload a ${aspect} overlay`
     input('[data-overlay-file]', root).value = ''
+    removeOverlayButton.hidden = url == null
+    if (url == null) frameSelected = false
+    overlayImg.style.zIndex = layerZ('overlay', frameSelected)
+    frame.classList.toggle('is-frame-selected', frameSelected)
+    scheduleSave()
   }
 
   function select(id: string | null): void {
+    clearSelection()
     selectedId = id
-    moodSelected = false
+    renderSlots()
+  }
+
+  function selectLayer(id: string): void {
+    clearSelection()
+    if (id === 'overlay') frameSelected = true
+    else if (id === 'mood') moodSelected = true
+    else selectedId = id
     renderSlots()
   }
 
   function addMood(): void {
     if (layout().mood) return
     layout().mood = defaultMood()
-    selectedId = null
+    layout().layers.push('mood')
+    clearSelection()
     moodSelected = true
+    commit()
     renderSlots()
     setStatus(`${aspect} mood face added — move, resize, or rotate it on the canvas`)
   }
@@ -395,16 +594,56 @@ export function mountStudio(root: HTMLElement): void {
   function removeMood(): void {
     if (!layout().mood) return
     delete layout().mood
+    layout().layers = layout().layers.filter((id) => id !== 'mood')
     moodSelected = false
+    commit()
     renderSlots()
     setStatus(`${aspect} will not render a mood face`)
   }
 
+  /** New photos go straight under the frame, like the app's default paint order. */
+  function insertSlot(slot: DraftSlot): void {
+    const { slots, layers } = layout()
+    slots.push(slot)
+    const overlayIndex = layers.indexOf('overlay')
+    layers.splice(overlayIndex < 0 ? layers.length : overlayIndex, 0, slot.id)
+    clearSelection()
+    selectedId = slot.id
+  }
+
+  /**
+   * First visit to an empty aspect copies the other aspect's slots, mood, and layer order so the author
+   * only nudges positions instead of redrawing. Heights are rescaled so each box keeps its dp size.
+   */
+  function seedFromOtherAspect(): void {
+    const target = layout()
+    if (target.slots.length > 0 || target.mood) return
+    const other: Aspect = aspect === 'story' ? 'post' : 'story'
+    const source = layouts[other]
+    if (source.slots.length === 0 && !source.mood) return
+    const scaleY = ASPECT_HEIGHT_DP[other] / ASPECT_HEIGHT_DP[aspect]
+    const idMap = new Map<string, string>()
+    target.slots = source.slots.map((slot) => {
+      const id = uid()
+      idMap.set(slot.id, id)
+      const h = clamp01(Math.min(1, slot.h * scaleY))
+      return { ...slot, id, h, y: clamp01(Math.min(slot.y * scaleY, 1 - h)) }
+    })
+    if (source.mood) {
+      const mood = { ...source.mood }
+      mood.y = mood.y * scaleY
+      clampMoodPosition(mood)
+      target.mood = mood
+    }
+    target.layers = source.layers.map((id) => idMap.get(id) ?? id)
+    commit()
+    setStatus(`copied ${target.slots.length} slots from ${other} — nudge them for ${aspect}`)
+  }
+
   function addSlot(): void {
     const slots = layout().slots
-    slots.push(defaultSlot(slots.length))
-    selectedId = slots[slots.length - 1].id
-    moodSelected = false
+    insertSlot(defaultSlot(slots.length))
+    commit()
     renderSlots()
     setStatus(`slot ${slots.length} added — drag it onto the hole`)
   }
@@ -413,11 +652,13 @@ export function mountStudio(root: HTMLElement): void {
     const slots = layout().slots
     const index = slots.findIndex((slot) => slot.id === selectedId)
     if (index < 0) return
-    slots.splice(index, 1)
+    const [removed] = slots.splice(index, 1)
+    layout().layers = layout().layers.filter((id) => id !== removed.id)
     slots.forEach((slot, i) => {
       slot.photo = i
     })
     selectedId = slots[index]?.id ?? slots[index - 1]?.id ?? null
+    commit()
     renderSlots()
   }
 
@@ -451,7 +692,7 @@ export function mountStudio(root: HTMLElement): void {
     if (moodEl instanceof HTMLElement) {
       const mood = layout().mood
       if (!mood) return
-      selectedId = null
+      clearSelection()
       moodSelected = true
       if (moodHandle === 'rotate') {
         pointer = {
@@ -475,8 +716,8 @@ export function mountStudio(root: HTMLElement): void {
       const id = slotEl.dataset.slotId
       const slot = layout().slots.find((item) => item.id === id)
       if (!slot || !id) return
+      clearSelection()
       selectedId = id
-      moodSelected = false
       if (handle === 'rotate') {
         pointer = { kind: 'rotate', id, origin: slot.rotation, startAngle: pointerAngle(event, slot) }
       } else if (handle === 'radius') {
@@ -495,16 +736,21 @@ export function mountStudio(root: HTMLElement): void {
       const id = slotEl.dataset.slotId
       const slot = layout().slots.find((item) => item.id === id)
       if (!slot || !id) return
+      clearSelection()
       selectedId = id
-      moodSelected = false
       pointer = { kind: 'move', id, startX: x, startY: y, originX: slot.x, originY: slot.y }
       paintSelection()
-    } else {
-      selectedId = null
-      moodSelected = false
+    } else if (mode === 'draw') {
+      clearSelection()
       pointer = { kind: 'draw', startX: x, startY: y }
       rubber.hidden = false
       paintSelection()
+    } else {
+      // select mode: empty canvas click picks the frame (when there is one) or clears the selection
+      clearSelection()
+      frameSelected = overlays[aspect] != null
+      paintSelection()
+      return
     }
     frame.setPointerCapture(event.pointerId)
     event.preventDefault()
@@ -596,23 +842,83 @@ export function mountStudio(root: HTMLElement): void {
           rotation: 0,
           cornerDp: 8,
         }
-        layout().slots.push(slot)
-        selectedId = slot.id
-        setStatus(`photo ${slot.photo + 1} drawn`)
+        insertSlot(slot)
+        setMode('select')
+        setStatus(`photo ${slot.photo + 1} drawn — back in select mode`)
       }
+      commit()
       renderSlots()
     } else if (pointer) {
+      commit()
       renderSlots()
     }
     pointer = null
   }
 
+  // Clicking the stage around the canvas clears the selection; the sidebar keeps it so its buttons still apply.
+  $('.stage', root).addEventListener('pointerdown', (event) => {
+    if (event.button !== 0 || frame.contains(event.target as Node)) return
+    clearSelection()
+    renderSlots()
+  })
+
+  // ⌘/Ctrl + wheel (and trackpad pinch, which arrives as a ctrlKey wheel) zooms about the cursor; a plain wheel scrolls.
+  const stage = $('.stage', root)
+  stage.addEventListener(
+    'wheel',
+    (event) => {
+      if (!(event.ctrlKey || event.metaKey)) return
+      event.preventDefault()
+      const before = zoom
+      setZoom(zoom * Math.exp(-event.deltaY * 0.01))
+      const ratio = zoom / before
+      const box = stage.getBoundingClientRect()
+      const px = event.clientX - box.left
+      const py = event.clientY - box.top
+      stage.scrollLeft = (stage.scrollLeft + px) * ratio - px
+      stage.scrollTop = (stage.scrollTop + py) * ratio - py
+    },
+    { passive: false },
+  )
+
   frame.addEventListener('pointerup', endPointer)
   frame.addEventListener('pointercancel', endPointer)
 
   list.addEventListener('click', (event) => {
-    const row = (event.target as HTMLElement).closest('[data-slot-id]')
-    if (row instanceof HTMLElement && row.dataset.slotId) select(row.dataset.slotId)
+    const target = event.target as HTMLElement
+    const row = target.closest('[data-layer]')
+    if (!(row instanceof HTMLElement) || !row.dataset.layer) return
+    if (target.closest('[data-layer-up]')) moveLayer(row.dataset.layer, 1)
+    else if (target.closest('[data-layer-down]')) moveLayer(row.dataset.layer, -1)
+    else selectLayer(row.dataset.layer)
+  })
+  list.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    const row = (event.target as HTMLElement).closest('[data-layer]')
+    if (row instanceof HTMLElement && row.dataset.layer && event.target === row) {
+      event.preventDefault()
+      selectLayer(row.dataset.layer)
+    }
+  })
+
+  function setMode(next: Mode): void {
+    mode = next
+    root.querySelectorAll<HTMLElement>('[data-mode]').forEach((node) => {
+      node.classList.toggle('is-active', node.dataset.mode === next)
+    })
+    frame.style.cursor = next === 'draw' ? 'crosshair' : 'default'
+    const hint = $('[data-mode-hint]', root)
+    hint.firstChild!.textContent =
+      next === 'draw'
+        ? 'draw: drag on the canvas to punch a photo hole · switches back to select after one · '
+        : 'select: click the frame, a slot, or the mood · move / resize · top knob rotates · inner dot rounds photo corners · '
+  }
+
+  root.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const next = button.dataset.mode
+      if (next === 'select' || next === 'draw') setMode(next)
+    })
   })
 
   $('[data-add-slot]', root).addEventListener('click', addSlot)
@@ -628,8 +934,8 @@ export function mountStudio(root: HTMLElement): void {
       root.querySelectorAll('[data-aspect]').forEach((node) => {
         node.classList.toggle('is-active', node === button)
       })
-      selectedId = null
-      moodSelected = false
+      clearSelection()
+      seedFromOtherAspect()
       renderOverlay()
       renderSlots()
     })
@@ -648,18 +954,42 @@ export function mountStudio(root: HTMLElement): void {
       return
     }
     overlays[aspect] = file
-    const previousUrl = overlayUrl[aspect]
-    if (previousUrl) URL.revokeObjectURL(previousUrl)
-    overlayUrl[aspect] = URL.createObjectURL(file)
+    clearSelection()
+    frameSelected = true
+    commit()
     renderOverlay()
+    renderSlots()
     setStatus(`${aspect} overlay loaded — drag slots onto the holes`)
   })
 
-  input('[data-icon-file]', root).addEventListener('change', (event) => {
+  function removeOverlay(): void {
+    if (!overlays[aspect]) return
+    overlays[aspect] = null
+    commit()
+    renderOverlay()
+    renderLayers()
+    setStatus(`${aspect} overlay removed — slots and mood stay put`)
+  }
+
+  removeOverlayButton.addEventListener('click', removeOverlay)
+
+  function imageSize(file: File): Promise<{ width: number; height: number }> {
+    return new Promise((resolve, reject) => {
+      const img = new Image()
+      img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight })
+      img.onerror = () => reject(new Error('undecodable image'))
+      img.src = URL.createObjectURL(file)
+    })
+  }
+
+  input('[data-icon-file]', root).addEventListener('change', async (event) => {
     const picker = event.target as HTMLInputElement
     const file = picker.files?.[0]
+    const iconStatus = $('[data-icon-status]', root)
     if (!file) {
       iconFile = null
+      iconStatus.textContent = ''
+      scheduleSave()
       return
     }
     if (!imageExt(file)) {
@@ -668,7 +998,26 @@ export function mountStudio(root: HTMLElement): void {
       toast('error', 'icon must be png, jpg, or jpeg')
       return
     }
+    const size = await imageSize(file).catch(() => null)
+    if (!size) {
+      picker.value = ''
+      iconFile = null
+      toast('error', 'icon could not be decoded')
+      return
+    }
+    if (size.width !== size.height || size.width < ICON_MIN_PX) {
+      picker.value = ''
+      iconFile = null
+      iconStatus.textContent = ''
+      toast('error', `icon must be square and at least ${ICON_MIN_PX}px — got ${size.width}×${size.height}`)
+      return
+    }
     iconFile = file
+    iconStatus.textContent =
+      size.width < ICON_RECOMMENDED_PX
+        ? `${size.width}px icon — ${ICON_RECOMMENDED_PX}px is recommended so the rail stays crisp`
+        : `${size.width}px icon ✓`
+    scheduleSave()
   })
 
   inspector.addEventListener('input', (event) => {
@@ -677,20 +1026,63 @@ export function mountStudio(root: HTMLElement): void {
     if (event.target.matches('[data-slot-photo]')) {
       slot.photo = Math.max(0, Math.floor(Number(event.target.value) - 1))
     }
+    commit()
     renderSlots()
   })
 
   document.addEventListener('keydown', (event) => {
-    if (event.key !== 'Backspace' && event.key !== 'Delete') return
     const active = document.activeElement
-    if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) return
-    if (!root.contains(active) && selectedId == null && !moodSelected) return
+    const typing = active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement
+    const meta = event.metaKey || event.ctrlKey
+    if (meta && !event.altKey) {
+      // Zoom: ⌘/Ctrl + / - / 0. Taken over from the browser so the page chrome stays put.
+      if (event.key === '=' || event.key === '+') {
+        event.preventDefault()
+        setZoom(zoom * ZOOM_STEP)
+        return
+      }
+      if (event.key === '-' || event.key === '_') {
+        event.preventDefault()
+        setZoom(zoom / ZOOM_STEP)
+        return
+      }
+      if (event.key === '0') {
+        event.preventDefault()
+        setZoom(1)
+        return
+      }
+      // Undo/redo: ⌘/Ctrl Z, ⌘/Ctrl ⇧ Z, Ctrl Y. Text fields keep the browser's own undo.
+      if (typing) return
+      const key = event.key.toLowerCase()
+      if (key === 'z' && event.shiftKey) {
+        event.preventDefault()
+        redo()
+        return
+      }
+      if (key === 'z') {
+        event.preventDefault()
+        undo()
+        return
+      }
+      if (key === 'y') {
+        event.preventDefault()
+        redo()
+        return
+      }
+      return
+    }
+    if (event.key !== 'Backspace' && event.key !== 'Delete') return
+    if (typing) return
+    if (!root.contains(active) && selectedLayer() == null) return
     if (selectedId) {
       event.preventDefault()
       removeSelected()
     } else if (moodSelected) {
       event.preventDefault()
       removeMood()
+    } else if (frameSelected) {
+      event.preventDefault()
+      removeOverlay()
     }
   })
 
@@ -704,7 +1096,56 @@ export function mountStudio(root: HTMLElement): void {
   input('[name="nameEn"]', root).addEventListener('input', () => {
     syncId()
   })
+  root.querySelectorAll('input[name]').forEach((field) => {
+    field.addEventListener('input', scheduleSave)
+  })
   syncId()
+
+  $('[data-reset]', root).addEventListener('click', () => {
+    if (!window.confirm('Start over? This clears the saved draft, both overlays, slots, and names.')) return
+    window.clearTimeout(saveTimer)
+    void clearDraft()
+    overlays.story = null
+    overlays.post = null
+    layouts.story = { slots: [], texts: [], layers: ['overlay'] }
+    layouts.post = { slots: [], texts: [], layers: ['overlay'] }
+    iconFile = null
+    input('[name="nameEn"]', root).value = ''
+    input('[name="nameVi"]', root).value = ''
+    input('[name="premium"]', root).checked = true
+    input('[data-icon-file]', root).value = ''
+    snippet.value = ''
+    syncId()
+    clearSelection()
+    resetHistory()
+    renderOverlay()
+    renderSlots()
+    toast('info', 'fresh canvas')
+  })
+
+  async function restoreDraft(): Promise<void> {
+    const draft = await loadDraft<Draft>()
+    if (!draft) return
+    input('[name="nameEn"]', root).value = draft.nameEn
+    input('[name="nameVi"]', root).value = draft.nameVi
+    input('[name="premium"]', root).checked = draft.premium
+    layouts.story = draft.layouts.story
+    layouts.post = draft.layouts.post
+    overlays.story = draft.overlays.story
+    overlays.post = draft.overlays.post
+    iconFile = draft.icon
+    syncId()
+    aspect = draft.aspect
+    root.querySelectorAll<HTMLElement>('[data-aspect]').forEach((node) => {
+      node.classList.toggle('is-active', node.dataset.aspect === aspect)
+    })
+    clearSelection()
+    resetHistory()
+    renderOverlay()
+    renderSlots()
+    toast('info', `restored your draft from ${new Date(draft.savedAt).toLocaleString()}`)
+    setStatus('draft restored — "start over" clears it')
+  }
 
   async function exportPack(): Promise<void> {
     const en = input('[name="nameEn"]', root).value.trim()
@@ -735,6 +1176,14 @@ export function mountStudio(root: HTMLElement): void {
       return
     }
 
+    const layers = (which: Aspect): Layer[] =>
+      layouts[which].layers.flatMap((id): Layer[] => {
+        if (id === 'overlay') return [{ kind: 'overlay' }]
+        if (id === 'mood') return [{ kind: 'mood' }]
+        const slot = layouts[which].slots.find((item) => item.id === id)
+        return slot ? [{ kind: 'photo', photo: slot.photo }] : []
+      })
+
     const texts = (which: Aspect): TextBind[] =>
       layouts[which].texts.map(({ bind, x, y, font, sizeSp, color }) => ({
         bind,
@@ -758,12 +1207,14 @@ export function mountStudio(root: HTMLElement): void {
           slots: layouts.story.slots,
           texts: texts('story'),
           mood: layouts.story.mood,
+          layers: layers('story'),
         },
         post: {
           overlay: postOverlay,
           slots: layouts.post.slots,
           texts: texts('post'),
           mood: layouts.post.mood,
+          layers: layers('post'),
         },
       })
       const entry = catalogSnippet(manifest, iconName)
@@ -790,18 +1241,22 @@ export function mountStudio(root: HTMLElement): void {
 
   async function fallbackIcon(): Promise<Uint8Array> {
     const canvas = document.createElement('canvas')
-    canvas.width = 128
-    canvas.height = 128
+    canvas.width = ICON_RECOMMENDED_PX
+    canvas.height = ICON_RECOMMENDED_PX
     const ctx = canvas.getContext('2d')
     if (!ctx) throw new Error('no 2d context')
     ctx.fillStyle = '#FBE7D6'
-    ctx.fillRect(0, 0, 128, 128)
+    ctx.fillRect(0, 0, ICON_RECOMMENDED_PX, ICON_RECOMMENDED_PX)
     ctx.fillStyle = '#F6B393'
-    ctx.fillRect(28, 28, 72, 72)
+    ctx.fillRect(56, 56, 144, 144)
     return pngFromCanvas(canvas)
   }
 
+  setMode('select')
+  setZoom(1)
   renderOverlay()
   renderSlots()
-  setStatus('upload a story overlay, then drag on the canvas to punch a photo hole')
+  resetHistory()
+  setStatus('upload a story overlay, then switch to draw slot to punch a photo hole')
+  void restoreDraft()
 }

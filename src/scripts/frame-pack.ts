@@ -1,6 +1,6 @@
-/** Pack schema v2 — the file committed to loggoo_asset. Canvas fractions, not pixels. */
+/** Pack schema v3 — the file committed to loggoo_asset. Canvas fractions, not pixels. v3 adds `layers`, the bottom-to-top paint order per aspect. */
 
-export const SCHEMA_VERSION = 2
+export const SCHEMA_VERSION = 3
 export const SLUG = /^[a-z0-9_]{1,40}$/
 export const BINDS = ['title', 'date', 'note', 'mood'] as const
 export const FONTS = ['poppins', 'caveat', 'sacramento', 'baloo', 'playfair'] as const
@@ -37,11 +37,16 @@ export type MoodPlacement = {
   rotation: number
 }
 
+/** One entry in the paint order. Text binds always paint above every layer. */
+export type Layer = { kind: 'overlay' } | { kind: 'photo'; photo: number } | { kind: 'mood' }
+
 export type AspectLayout = {
   overlay: string
   slots: Slot[]
   texts: TextBind[]
   mood?: MoodPlacement
+  /** Bottom to top. Contains the overlay once, every photo once, and the mood iff present. */
+  layers: Layer[]
 }
 
 export type PackManifest = {
@@ -131,12 +136,42 @@ export function sanitizeMood(mood: MoodPlacement, aspect: Aspect): MoodPlacement
   }
 }
 
+/** Default order: photos in index order, then the overlay, then the mood. */
+export function defaultLayers(slots: Slot[], hasMood: boolean): Layer[] {
+  const layers: Layer[] = slots.map((slot) => ({ kind: 'photo', photo: slot.photo }))
+  layers.push({ kind: 'overlay' })
+  if (hasMood) layers.push({ kind: 'mood' })
+  return layers
+}
+
+/** Keeps the author's order but guarantees every layer appears exactly once; missing ones fall to the bottom. */
+export function sanitizeLayers(layers: Layer[], slots: Slot[], hasMood: boolean): Layer[] {
+  const photos = new Set(slots.map((slot) => slot.photo))
+  const seen = new Set<string>()
+  const out: Layer[] = []
+  for (const layer of layers) {
+    const key = layer.kind === 'photo' ? `photo:${layer.photo}` : layer.kind
+    if (seen.has(key)) continue
+    if (layer.kind === 'photo' && !photos.has(layer.photo)) continue
+    if (layer.kind === 'mood' && !hasMood) continue
+    seen.add(key)
+    out.push(layer)
+  }
+  const missing = defaultLayers(slots, hasMood).filter((layer) => {
+    const key = layer.kind === 'photo' ? `photo:${layer.photo}` : layer.kind
+    return !seen.has(key)
+  })
+  return [...missing, ...out]
+}
+
+type AspectInput = { overlay: string; slots: Slot[]; texts: TextBind[]; mood?: MoodPlacement; layers?: Layer[] }
+
 export function buildManifest(input: {
   id: string
   names: { en: string; vi: string }
   premium: boolean
-  story: { overlay: string; slots: Slot[]; texts: TextBind[]; mood?: MoodPlacement }
-  post: { overlay: string; slots: Slot[]; texts: TextBind[]; mood?: MoodPlacement }
+  story: AspectInput
+  post: AspectInput
 }): PackManifest {
   const storySlots = input.story.slots.map(sanitizeSlot)
   const postSlots = input.post.slots.map(sanitizeSlot)
@@ -156,12 +191,14 @@ export function buildManifest(input: {
       slots: storySlots,
       texts: input.story.texts,
       ...(input.story.mood ? { mood: sanitizeMood(input.story.mood, 'story') } : {}),
+      layers: sanitizeLayers(input.story.layers ?? [], storySlots, input.story.mood != null),
     },
     post: {
       overlay: input.post.overlay,
       slots: postSlots,
       texts: input.post.texts,
       ...(input.post.mood ? { mood: sanitizeMood(input.post.mood, 'post') } : {}),
+      layers: sanitizeLayers(input.post.layers ?? [], postSlots, input.post.mood != null),
     },
   }
 }

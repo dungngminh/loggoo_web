@@ -37,14 +37,20 @@ import Logo from '../components/Logo.astro';
           <span>name · vi</span>
           <input name="nameVi" type="text" placeholder="sổ dán" autocomplete="off" />
         </label>
-        <p class="studio__id">id · <code data-id>—</code></p>
+        <div class="studio__row">
+          <p class="studio__id">id · <code data-id>—</code></p>
+          <button class="btn btn--ghost btn--sm" type="button" data-reset>start over</button>
+        </div>
         <label class="check">
           <input name="premium" type="checkbox" checked />
           <span>loggoo plus</span>
         </label>
 
         <div class="studio__block">
-          <p class="studio__label">overlay for this aspect</p>
+          <div class="studio__row">
+            <p class="studio__label">overlay for this aspect</p>
+            <button class="btn btn--ghost btn--sm" type="button" data-remove-overlay hidden>remove overlay</button>
+          </div>
           <p class="studio__hint">png, jpg, or jpeg. use png if the holes should be transparent.</p>
           <label class="file">
             <input data-overlay-file type="file" accept="image/png,image/jpeg,.png,.jpg,.jpeg" />
@@ -54,6 +60,8 @@ import Logo from '../components/Logo.astro';
             <input data-icon-file type="file" accept="image/png,image/jpeg,.png,.jpg,.jpeg" />
             <span>rail icon (optional)</span>
           </label>
+          <p class="studio__hint">icon: square png, 256×256 recommended (min 128), transparent background, line art with ~2px strokes at 34px — it shows at 40dp in the rail.</p>
+          <p class="studio__hint" data-icon-status></p>
         </div>
 
         <div class="studio__block">
@@ -67,10 +75,11 @@ import Logo from '../components/Logo.astro';
 
         <div class="studio__block">
           <div class="studio__row">
-            <p class="studio__label">photo slots</p>
+            <p class="studio__label">layers · top first</p>
             <button class="btn btn--ghost btn--sm" type="button" data-add-slot>add slot</button>
           </div>
-          <div class="slot-list" data-slot-list></div>
+          <p class="studio__hint">click a row to select it · ▲ ▼ change what paints on top. text always paints above.</p>
+          <div class="layer-list" data-layer-list></div>
           <div class="inspector" data-inspector hidden>
             <label class="field">
               <span>photo index</span>
@@ -91,12 +100,19 @@ import Logo from '../components/Logo.astro';
       </aside>
 
       <section class="studio__stage">
-        <div class="aspect-toggle" role="tablist" aria-label="frame aspect">
-          <button class="is-active" type="button" data-aspect="story">story 9:16</button>
-          <button type="button" data-aspect="post">post 4:5</button>
+        <div class="studio__toolbar">
+          <div class="aspect-toggle" role="tablist" aria-label="frame aspect">
+            <button class="is-active" type="button" data-aspect="story">story 9:16</button>
+            <button type="button" data-aspect="post">post 4:5</button>
+          </div>
+          <div class="aspect-toggle" role="tablist" aria-label="canvas mode">
+            <button class="is-active" type="button" data-mode="select">select</button>
+            <button type="button" data-mode="draw">draw slot</button>
+          </div>
+          <p class="studio__zoom" title="⌘/Ctrl + · − · 0 or ⌘/Ctrl + wheel / pinch to zoom · ⌘/Ctrl Z undo · ⇧⌘/Ctrl Z redo">zoom <span data-zoom>100%</span></p>
         </div>
-        <p class="studio__stage-hint">
-          drag to draw a photo hole · move / resize · top knob rotates · inner dot rounds photo corners ·
+        <p class="studio__stage-hint" data-mode-hint>
+          select: click the frame, a slot, or the mood · move / resize · top knob rotates · inner dot rounds photo corners ·
           <span data-aspect-label>9:16 story</span>
         </p>
         <div class="stage">
@@ -204,6 +220,14 @@ import Logo from '../components/Logo.astro';
     font-weight: 600;
     color: var(--lg-on-surface-variant);
   }
+  .studio__toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .studio__zoom {
+    margin: 0 0 0 auto;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--lg-on-surface-muted);
+    cursor: help;
+  }
   .studio__stage-hint {
     margin: 10px 0 0;
     font-size: 13px;
@@ -300,16 +324,19 @@ import Logo from '../components/Logo.astro';
   .stage {
     flex: 1;
     min-height: 0;
-    display: grid;
-    place-items: center;
+    display: flex;
+    overflow: auto;
     padding: 16px 0 0;
     container-type: size;
   }
   .frame {
+    /* margin auto centers while the frame fits and pins it to the start once zoom overflows, so every edge stays scrollable */
+    margin: auto;
+    flex: none;
     position: relative;
     aspect-ratio: 9 / 16;
-    width: min(100cqw, calc(100cqh * 9 / 16));
-    height: min(100cqh, calc(100cqw * 16 / 9));
+    width: calc(min(100cqw, calc(100cqh * 9 / 16)) * var(--zoom, 1));
+    height: calc(min(100cqh, calc(100cqw * 16 / 9)) * var(--zoom, 1));
     cursor: crosshair;
     background: var(--lg-surface-container);
     border-radius: 18px;
@@ -320,8 +347,8 @@ import Logo from '../components/Logo.astro';
   }
   .frame[data-aspect="post"] {
     aspect-ratio: 4 / 5;
-    width: min(100cqw, calc(100cqh * 4 / 5));
-    height: min(100cqh, calc(100cqw * 5 / 4));
+    width: calc(min(100cqw, calc(100cqh * 4 / 5)) * var(--zoom, 1));
+    height: calc(min(100cqh, calc(100cqw * 5 / 4)) * var(--zoom, 1));
   }
   .frame__overlay {
     position: absolute;
@@ -332,7 +359,11 @@ import Logo from '../components/Logo.astro';
     object-fit: fill;
     pointer-events: none;
     border-radius: 18px;
-    z-index: 0;
+    /* z-index comes inline from the layer order; the selected layer lifts to 100 so handles stay grabbable */
+  }
+  .frame.is-frame-selected .frame__overlay {
+    outline: 2.5px solid var(--lg-secondary);
+    outline-offset: -2.5px;
   }
   .frame__overlay[hidden] { display: none !important; }
   .frame__empty {
@@ -348,11 +379,9 @@ import Logo from '../components/Logo.astro';
     pointer-events: none;
   }
   .frame:not(.has-overlay) .frame__empty { display: grid; }
-  .frame__slots, .frame__mood, .frame__rubber { position: absolute; inset: 0; }
-  .frame__slots { z-index: 1; }
-  .frame__mood { z-index: 2; }
+  .frame__slots, .frame__mood, .frame__rubber { position: absolute; inset: 0; pointer-events: none; }
   .frame__rubber {
-    z-index: 3;
+    z-index: 200;
     border: 1.5px dashed var(--lg-secondary);
     background: color-mix(in srgb, var(--lg-primary) 28%, transparent);
     pointer-events: none;
@@ -365,8 +394,9 @@ import Logo from '../components/Logo.astro';
     cursor: grab;
     touch-action: none;
     overflow: visible;
+    pointer-events: auto;
   }
-  .slot.is-selected { z-index: 2; cursor: grabbing; }
+  .slot.is-selected { cursor: grabbing; }
   .slot__fill {
     position: absolute;
     inset: 0;
@@ -378,7 +408,7 @@ import Logo from '../components/Logo.astro';
   }
   .slot.is-selected .slot__fill {
     box-shadow: inset 0 0 0 2.5px var(--lg-secondary);
-    opacity: .9;
+    opacity: .45;
   }
   .slot__label {
     position: absolute;
@@ -457,13 +487,13 @@ import Logo from '../components/Logo.astro';
     aspect-ratio: 1;
     cursor: grab;
     touch-action: none;
+    pointer-events: auto;
     color: var(--lg-on-mood);
     border-radius: 12px;
     background: color-mix(in srgb, var(--lg-primary) 78%, transparent);
     box-shadow: inset 0 0 0 1.5px rgba(74, 55, 40, .35);
   }
   .mood-face.is-selected {
-    z-index: 4;
     cursor: grabbing;
     box-shadow: inset 0 0 0 2.5px var(--lg-secondary);
   }
@@ -512,25 +542,48 @@ import Logo from '../components/Logo.astro';
   }
   .mood-face.is-selected .mood-face__size,
   .mood-face.is-selected .slot__rotate { display: block; }
-  .slot-list { display: flex; flex-direction: column; gap: 6px; }
-  .slot-row {
+  .layer-list { display: flex; flex-direction: column; gap: 6px; }
+  .layer-row {
     display: flex;
-    justify-content: space-between;
+    align-items: center;
     gap: 8px;
     width: 100%;
     border: 1px solid var(--lg-outline-variant);
     background: var(--lg-background);
     border-radius: 12px;
-    padding: 8px 10px;
+    padding: 6px 6px 6px 10px;
     font-size: 13px;
     font-weight: 700;
     color: var(--lg-on-background);
     cursor: pointer;
   }
-  .slot-row.is-selected {
+  .layer-row.is-selected {
     border-color: var(--lg-primary-hover);
     background: var(--lg-primary-container);
   }
+  .layer-row.is-missing { color: var(--lg-on-surface-subtle); }
+  .layer-row__swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    background: var(--swatch, var(--lg-surface-dim));
+    box-shadow: inset 0 0 0 1px rgba(74, 55, 40, .25);
+    flex: none;
+  }
+  .layer-row__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .layer-row__tools { display: flex; gap: 2px; }
+  .layer-row__tools button {
+    border: 0;
+    background: transparent;
+    width: 24px;
+    height: 24px;
+    border-radius: 8px;
+    font-size: 11px;
+    color: var(--lg-on-surface-variant);
+    cursor: pointer;
+  }
+  .layer-row__tools button:hover:not(:disabled) { background: var(--lg-surface-dim); }
+  .layer-row__tools button:disabled { opacity: .3; cursor: default; }
   .inspector {
     display: flex;
     flex-direction: column;
