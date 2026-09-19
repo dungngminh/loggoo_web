@@ -6,6 +6,12 @@
  */
 
 export const SCHEMA_VERSION = 4
+/** Every schema the studio can still export, newest first, with the app releases that read it. */
+export const SCHEMA_VERSIONS = [
+  { version: 4, app: '1.5.1 and up' },
+  { version: 3, app: '1.5.0' },
+  { version: 2, app: '1.4.1 and below' },
+] as const
 export const SLUG = /^[a-z0-9_]{1,40}$/
 export const BINDS = ['title', 'date', 'note', 'mood'] as const
 export const FONTS = ['poppins', 'caveat', 'sacramento', 'baloo', 'playfair'] as const
@@ -220,9 +226,20 @@ type AspectInput = {
   layers?: Layer[]
 }
 
-function buildAspect(input: AspectInput, aspect: Aspect, slots: Slot[]): AspectLayout {
+/** Drops what older readers never had: v3 lacks background / logo / text box fields, v2 also lacks `layers`. */
+function downgradeAspect(layout: AspectLayout, schemaVersion: number): AspectLayout {
+  if (schemaVersion >= SCHEMA_VERSION) return layout
+  const { background: _bg, logo: _logo, ...rest } = layout
+  const texts = layout.texts.map(({ w: _w, rotation: _r, maxLines: _m, align: _a, ...text }) => text as TextBind)
+  const layers = layout.layers.filter((layer) => layer.kind !== 'logo')
+  if (schemaVersion >= 3) return { ...rest, texts, layers }
+  const { layers: _layers, ...v2 } = rest
+  return { ...v2, texts } as AspectLayout
+}
+
+function buildAspect(input: AspectInput, aspect: Aspect, slots: Slot[], schemaVersion: number): AspectLayout {
   const stickers = { mood: input.mood != null, logo: input.logo != null }
-  return {
+  const layout: AspectLayout = {
     overlay: input.overlay,
     ...(input.background ? { background: input.background } : {}),
     slots,
@@ -231,6 +248,7 @@ function buildAspect(input: AspectInput, aspect: Aspect, slots: Slot[]): AspectL
     ...(input.logo ? { logo: { ...sanitizeMood(input.logo, aspect), style: input.logo.style } } : {}),
     layers: sanitizeLayers(input.layers ?? [], slots, stickers),
   }
+  return downgradeAspect(layout, schemaVersion)
 }
 
 export function buildManifest(input: {
@@ -239,7 +257,10 @@ export function buildManifest(input: {
   premium: boolean
   story: AspectInput
   post: AspectInput
+  /** Defaults to the newest schema; older values strip the fields that reader never had. */
+  schemaVersion?: number
 }): PackManifest {
+  const schemaVersion = input.schemaVersion ?? SCHEMA_VERSION
   const storySlots = input.story.slots.map(sanitizeSlot)
   const postSlots = input.post.slots.map(sanitizeSlot)
   const photoCapacity = Math.max(
@@ -248,20 +269,20 @@ export function buildManifest(input: {
     ...postSlots.map((slot) => slot.photo + 1),
   )
   return {
-    schemaVersion: SCHEMA_VERSION,
+    schemaVersion,
     id: input.id,
     names: input.names,
     premium: input.premium,
     photoCapacity,
-    story: buildAspect(input.story, 'story', storySlots),
-    post: buildAspect(input.post, 'post', postSlots),
+    story: buildAspect(input.story, 'story', storySlots, schemaVersion),
+    post: buildAspect(input.post, 'post', postSlots, schemaVersion),
   }
 }
 
 export function catalogSnippet(manifest: PackManifest, iconFile = 'icon.png'): CatalogEntry {
   return {
     id: manifest.id,
-    schemaVersion: SCHEMA_VERSION,
+    schemaVersion: manifest.schemaVersion,
     updatedAt: new Date().toISOString(),
     premium: manifest.premium,
     names: manifest.names,

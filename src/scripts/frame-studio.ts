@@ -5,6 +5,7 @@ import {
   IMAGE_ACCEPT,
   LOGO_STYLES,
   MAX_TEXT_LINES,
+  SCHEMA_VERSION,
   type Align,
   type Aspect,
   type Background,
@@ -45,6 +46,7 @@ type Draft = {
   nameEn: string
   nameVi: string
   premium: boolean
+  schemaVersion?: number
   aspect: Aspect
   layouts: Record<Aspect, Layout>
   overlays: Record<Aspect, File | null>
@@ -303,6 +305,17 @@ export function mountStudio(root: HTMLElement): void {
     $('[data-zoom]', root).textContent = `${Math.round(zoom * 100)}%`
   }
 
+  function schemaVersion(): number {
+    return Number(selectEl('[name="schemaVersion"]', root).value) || SCHEMA_VERSION
+  }
+
+  /** `data-schema` on the root drives the CSS that hides controls the chosen schema never had; canvas colour is inline so it re-renders. */
+  function syncSchemaHint(): void {
+    root.dataset.schema = String(schemaVersion())
+    $('[data-schema-hint]', root).hidden = schemaVersion() >= SCHEMA_VERSION
+    renderBackground()
+  }
+
   function scheduleSave(): void {
     window.clearTimeout(saveTimer)
     saveTimer = window.setTimeout(() => {
@@ -310,6 +323,7 @@ export function mountStudio(root: HTMLElement): void {
         nameEn: input('[name="nameEn"]', root).value,
         nameVi: input('[name="nameVi"]', root).value,
         premium: input('[name="premium"]', root).checked,
+        schemaVersion: schemaVersion(),
         aspect,
         layouts: JSON.parse(JSON.stringify(layouts)) as Record<Aspect, Layout>,
         overlays: { ...overlays },
@@ -573,6 +587,7 @@ export function mountStudio(root: HTMLElement): void {
       const el = document.createElement('div')
       el.className = `mood-face mood-face--${which}`
       el.dataset.sticker = which
+      if (which === 'logo') el.dataset.minSchema = '4'
       el.setAttribute('role', 'button')
       el.setAttribute('aria-label', which === 'mood' ? 'mood face placement' : 'loggoo icon placement')
       const art =
@@ -608,8 +623,8 @@ export function mountStudio(root: HTMLElement): void {
       el.innerHTML = `
         <span class="text-box__body"></span>
         <span class="text-box__meta"></span>
-        <span class="text-box__width" data-text-handle="w" aria-label="change text width"></span>
-        <span class="slot__rotate" data-text-handle="rotate" aria-label="rotate text"></span>
+        <span class="text-box__width" data-text-handle="w" aria-label="change text width" data-min-schema="4"></span>
+        <span class="slot__rotate" data-text-handle="rotate" aria-label="rotate text" data-min-schema="4"></span>
       `
       $('.text-box__body', el).textContent = NOTE_SAMPLE
       applyTextBox(el, text)
@@ -704,9 +719,10 @@ export function mountStudio(root: HTMLElement): void {
         id,
         name,
         swatch,
-        `<button type="button" data-layer-up aria-label="bring forward" ${i === top ? 'disabled' : ''}>▲</button>
-         <button type="button" data-layer-down aria-label="send backward" ${i === 0 ? 'disabled' : ''}>▼</button>`,
+        `<button type="button" data-layer-up aria-label="bring forward" data-min-schema="3" ${i === top ? 'disabled' : ''}>▲</button>
+         <button type="button" data-layer-down aria-label="send backward" data-min-schema="3" ${i === 0 ? 'disabled' : ''}>▼</button>`,
       )
+      if (id === 'logo') row.dataset.minSchema = '4'
       row.classList.toggle('is-missing', id === 'overlay' && overlays[aspect] == null)
       list.append(row)
     }
@@ -719,6 +735,7 @@ export function mountStudio(root: HTMLElement): void {
       '<span class="layer-row__pin">bottom</span>',
     )
     row.classList.add('is-pinned')
+    row.dataset.minSchema = '4'
     row.classList.toggle('is-missing', background == null)
     list.append(row)
   }
@@ -740,7 +757,7 @@ export function mountStudio(root: HTMLElement): void {
 
   function renderBackground(): void {
     const background = backgrounds[aspect]
-    frame.style.background = background?.kind === 'color' ? background.color : ''
+    frame.style.background = background?.kind === 'color' && schemaVersion() >= SCHEMA_VERSION ? background.color : ''
     if (background?.kind === 'image') {
       backgroundImg.hidden = false
       backgroundImg.src = urlFor(background.file)
@@ -1438,9 +1455,10 @@ export function mountStudio(root: HTMLElement): void {
   input('[name="nameEn"]', root).addEventListener('input', () => {
     syncId()
   })
-  root.querySelectorAll('input[name]').forEach((field) => {
+  root.querySelectorAll('input[name], select[name]').forEach((field) => {
     field.addEventListener('input', scheduleSave)
   })
+  selectEl('[name="schemaVersion"]', root).addEventListener('input', syncSchemaHint)
   syncId()
 
   $('[data-reset]', root).addEventListener('click', () => {
@@ -1457,6 +1475,8 @@ export function mountStudio(root: HTMLElement): void {
     input('[name="nameEn"]', root).value = ''
     input('[name="nameVi"]', root).value = ''
     input('[name="premium"]', root).checked = true
+    selectEl('[name="schemaVersion"]', root).value = String(SCHEMA_VERSION)
+    syncSchemaHint()
     input('[data-icon-file]', root).value = ''
     snippet.value = ''
     syncId()
@@ -1473,6 +1493,8 @@ export function mountStudio(root: HTMLElement): void {
     input('[name="nameEn"]', root).value = draft.nameEn
     input('[name="nameVi"]', root).value = draft.nameVi
     input('[name="premium"]', root).checked = draft.premium
+    selectEl('[name="schemaVersion"]', root).value = String(draft.schemaVersion ?? SCHEMA_VERSION)
+    syncSchemaHint()
     layouts.story = draft.layouts.story
     layouts.post = draft.layouts.post
     overlays.story = draft.overlays.story
@@ -1552,6 +1574,7 @@ export function mountStudio(root: HTMLElement): void {
         id,
         names: { en, vi },
         premium: input('[name="premium"]', root).checked,
+        schemaVersion: schemaVersion(),
         story: {
           overlay: storyOverlay,
           background: storyBg.manifest,
@@ -1611,6 +1634,7 @@ export function mountStudio(root: HTMLElement): void {
 
   setMode('select')
   setZoom(1)
+  syncSchemaHint()
   renderOverlay()
   renderSlots()
   resetHistory()
