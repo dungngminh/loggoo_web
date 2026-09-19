@@ -103,6 +103,17 @@ const FONT_FAMILY: Record<Font, string> = {
 }
 
 const FILLS = ['#F6B393', '#9BD9B8', '#A9D6EE', '#F6E3A3', '#F3C3CB', '#E8804F']
+/** Placeholder "photos" for preview mode: little pastel scenes as inline SVG, one per photo index. */
+const PREVIEW_PHOTOS = [
+  // sunset over hills
+  `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 400'><defs><linearGradient id='s' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='#F6B393'/><stop offset='1' stop-color='#F6E3A3'/></linearGradient></defs><rect width='400' height='400' fill='url(#s)'/><circle cx='280' cy='150' r='56' fill='#FBF6F0' opacity='.85'/><path d='M0 300 Q120 200 240 290 T400 270 V400 H0z' fill='#9BD9B8'/><path d='M0 340 Q160 260 400 330 V400 H0z' fill='#6FB894'/></svg>`,
+  // sea and sky
+  `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 400'><rect width='400' height='400' fill='#A9D6EE'/><ellipse cx='110' cy='110' rx='70' ry='28' fill='#FBF6F0' opacity='.9'/><ellipse cx='300' cy='70' rx='50' ry='20' fill='#FBF6F0' opacity='.7'/><rect y='240' width='400' height='160' fill='#5FA8D3'/><path d='M0 250 Q50 240 100 250 T200 250 T300 250 T400 250' stroke='#FBF6F0' stroke-width='4' fill='none' opacity='.6'/></svg>`,
+  // pink blossom
+  `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 400'><rect width='400' height='400' fill='#F3C3CB'/><circle cx='120' cy='150' r='70' fill='#E8804F' opacity='.55'/><circle cx='250' cy='230' r='95' fill='#F6B393' opacity='.7'/><circle cx='320' cy='110' r='40' fill='#FBF6F0' opacity='.8'/><path d='M60 360 L120 250 L200 380z' fill='#4A3728' opacity='.35'/></svg>`,
+  // night
+  `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 400'><rect width='400' height='400' fill='#4A3728'/><circle cx='300' cy='100' r='40' fill='#F6E3A3'/><circle cx='80' cy='60' r='3' fill='#FBF6F0'/><circle cx='150' cy='130' r='2' fill='#FBF6F0'/><circle cx='220' cy='50' r='2.5' fill='#FBF6F0'/><path d='M0 320 Q100 260 200 320 T400 300 V400 H0z' fill='#211915'/></svg>`,
+].map((svg) => `url("data:image/svg+xml,${encodeURIComponent(svg)}")`)
 function uid(): string {
   return crypto.randomUUID()
 }
@@ -214,6 +225,7 @@ export function mountStudio(root: HTMLElement): void {
   const inspector = $('[data-inspector]', root)
   const lockRatio = input('[data-slot-lock]', root)
   const textInspector = $('[data-text-inspector]', root)
+  const stickerInspector = $('[data-sticker-inspector]', root)
   const snippet = $('[data-snippet]', root) as HTMLTextAreaElement
   const status = $('[data-status]', root)
   const toasts = $('[data-toasts]')
@@ -222,6 +234,9 @@ export function mountStudio(root: HTMLElement): void {
   const removeBackgroundButton = $('[data-remove-background]', root) as HTMLButtonElement
   const backgroundStatus = $('[data-background-status]', root)
   const addTextButton = $('[data-add-text]', root) as HTMLButtonElement
+  const undoButton = $('[data-undo]', root) as HTMLButtonElement
+  const redoButton = $('[data-redo]', root) as HTMLButtonElement
+  const savedLabel = $('[data-saved]', root)
 
   const overlays: Record<Aspect, File | null> = { story: null, post: null }
   const backgrounds: Record<Aspect, DraftBackground | null> = { story: null, post: null }
@@ -275,6 +290,12 @@ export function mountStudio(root: HTMLElement): void {
     history.push(next)
     if (history.length > HISTORY_LIMIT) history.shift()
     historyIndex = history.length - 1
+    paintHistory()
+  }
+
+  function paintHistory(): void {
+    undoButton.disabled = historyIndex <= 0
+    redoButton.disabled = historyIndex >= history.length - 1
   }
 
   function resetHistory(): void {
@@ -300,6 +321,7 @@ export function mountStudio(root: HTMLElement): void {
     if (historyIndex <= 0) return
     historyIndex--
     restore(history[historyIndex])
+    paintHistory()
     setStatus('undo')
   }
 
@@ -307,6 +329,7 @@ export function mountStudio(root: HTMLElement): void {
     if (historyIndex >= history.length - 1) return
     historyIndex++
     restore(history[historyIndex])
+    paintHistory()
     setStatus('redo')
   }
 
@@ -329,6 +352,7 @@ export function mountStudio(root: HTMLElement): void {
 
   function scheduleSave(): void {
     window.clearTimeout(saveTimer)
+    savedLabel.textContent = 'saving…'
     saveTimer = window.setTimeout(() => {
       const draft: Draft = {
         nameEn: input('[name="nameEn"]', root).value,
@@ -342,13 +366,23 @@ export function mountStudio(root: HTMLElement): void {
         icon: iconFile,
         savedAt: Date.now(),
       }
-      void saveDraft(draft)
+      void saveDraft(draft).then(
+        () => (savedLabel.textContent = `saved ${new Date(draft.savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`),
+        () => (savedLabel.textContent = 'not saved'),
+      )
     }, 400)
   }
 
   /** Inline z-index: 10 + stack position; texts sit at 90; the selected layer lifts above everything so its handles stay reachable. */
   function layerZ(id: string, isSelected: boolean): string {
     return isSelected ? '100' : String(10 + layout().layers.indexOf(id))
+  }
+
+  /** Lights the active page button (the `.frame` also carries data-aspect; the class is harmless there). */
+  function paintAspect(): void {
+    root.querySelectorAll<HTMLElement>('[data-aspect]').forEach((node) => {
+      node.classList.toggle('is-active', node.dataset.aspect === aspect)
+    })
   }
 
   function moveLayer(id: string, delta: 1 | -1): void {
@@ -364,6 +398,22 @@ export function mountStudio(root: HTMLElement): void {
 
   function selected(): DraftSlot | undefined {
     return layout().slots.find((slot) => slot.id === selection)
+  }
+
+  function selectedSticker(): Sticker | undefined {
+    return selection === 'mood' || selection === 'logo' ? selection : undefined
+  }
+
+  /** The design panel shows the section this kind needs; 'none' / 'frame' / 'background' fall back to the aspect settings. */
+  function paintSelectionKind(): void {
+    root.dataset.selection =
+      selection == null ? 'none'
+      : selection === 'overlay' ? 'frame'
+      : selection === 'background' ? 'background'
+      : selectedSticker() ? 'sticker'
+      : selectedText() ? 'text'
+      : selected() ? 'slot'
+      : 'none'
   }
 
   function selectedText(): DraftText | undefined {
@@ -387,13 +437,17 @@ export function mountStudio(root: HTMLElement): void {
     status.textContent = message
   }
 
+  // One toast at a time: a new one replaces whatever is showing, so rapid actions never stack a column of them.
+  let toastTimer: number | undefined
   function toast(kind: 'error' | 'success' | 'info', message: string): void {
+    window.clearTimeout(toastTimer)
+    toasts.replaceChildren()
     const el = document.createElement('p')
     el.className = `toast toast--${kind}`
     el.setAttribute('role', kind === 'error' ? 'alert' : 'status')
     el.textContent = message
     toasts.append(el)
-    window.setTimeout(() => {
+    toastTimer = window.setTimeout(() => {
       el.classList.add('is-leaving')
       window.setTimeout(() => el.remove(), 220)
     }, kind === 'error' ? 4200 : 2800)
@@ -525,6 +579,7 @@ export function mountStudio(root: HTMLElement): void {
     el.style.transform = `rotate(${slot.rotation}deg)`
     el.style.zIndex = layerZ(slot.id, isSelected)
     el.style.setProperty('--fill', FILLS[slot.photo % FILLS.length])
+    el.style.setProperty('--photo', PREVIEW_PHOTOS[slot.photo % PREVIEW_PHOTOS.length])
     el.style.setProperty('--corner', `${slot.cornerDp}`)
     const label = el.querySelector('.slot__label')
     const meta = el.querySelector('.slot__meta')
@@ -612,6 +667,7 @@ export function mountStudio(root: HTMLElement): void {
     for (const row of list.querySelectorAll<HTMLElement>('[data-layer]')) {
       row.classList.toggle('is-selected', row.dataset.layer === selection)
     }
+    paintSelectionKind()
   }
 
   function renderStickers(): void {
@@ -621,13 +677,14 @@ export function mountStudio(root: HTMLElement): void {
       const addButton = $(`[data-add-sticker="${which}"]`, root) as HTMLButtonElement
       const deleteButton = $(`[data-delete-sticker="${which}"]`, root) as HTMLButtonElement
       addButton.hidden = sticker != null
-      deleteButton.hidden = sticker == null
-      $(`[data-sticker-status="${which}"]`, root).textContent =
-        sticker == null ? 'not used in this aspect' : `${Math.round(sticker.sizeDp)}dp ${which === 'mood' ? 'mood face' : 'loggoo mark'}`
+      deleteButton.hidden = selection !== which
+      const statusEl = $(`[data-sticker-status="${which}"]`, root)
+      statusEl.hidden = selection !== which
+      statusEl.textContent = which === 'mood' ? 'mood face' : 'loggoo icon'
       if (which === 'logo') {
         const logo = layout().logo
         root.querySelectorAll<HTMLElement>('[data-logo-style]').forEach((node) => {
-          node.hidden = logo == null
+          node.hidden = logo == null || selection !== 'logo'
           node.classList.toggle('is-active', node.dataset.logoStyle === logo?.style)
         })
       }
@@ -773,6 +830,7 @@ export function mountStudio(root: HTMLElement): void {
       )
       if (id === 'logo') row.dataset.minSchema = '4'
       row.classList.toggle('is-missing', id === 'overlay' && overlays[aspect] == null)
+      row.classList.toggle('is-movable', schemaVersion() >= 3)
       list.append(row)
     }
     // The background always paints first: pinned row at the bottom.
@@ -790,17 +848,36 @@ export function mountStudio(root: HTMLElement): void {
   }
 
   function renderInspector(): void {
+    paintSelectionKind()
     const slot = selected()
     inspector.hidden = slot == null
     if (slot) {
       input('[data-slot-photo]', inspector).value = String(slot.photo + 1)
+      input('[data-slot-x]', inspector).value = String(Math.round(slot.x * FRAME_WIDTH_DP))
+      input('[data-slot-y]', inspector).value = String(Math.round(slot.y * ASPECT_HEIGHT_DP[aspect]))
       input('[data-slot-w]', inspector).value = String(Math.round(slot.w * FRAME_WIDTH_DP))
       input('[data-slot-h]', inspector).value = String(Math.round(slot.h * ASPECT_HEIGHT_DP[aspect]))
+      input('[data-slot-rotation]', inspector).value = String(Math.round(slot.rotation))
+      input('[data-slot-corner]', inspector).value = String(Math.round(slot.cornerDp))
+    }
+
+    const which = selectedSticker()
+    const sticker = which && layout()[which]
+    stickerInspector.hidden = sticker == null
+    if (sticker) {
+      input('[data-sticker-x]', stickerInspector).value = String(Math.round(sticker.x * FRAME_WIDTH_DP))
+      input('[data-sticker-y]', stickerInspector).value = String(Math.round(sticker.y * ASPECT_HEIGHT_DP[aspect]))
+      input('[data-sticker-size]', stickerInspector).value = String(Math.round(sticker.sizeDp))
+      input('[data-sticker-rotation]', stickerInspector).value = String(Math.round(sticker.rotation))
     }
 
     const text = selectedText()
     textInspector.hidden = text == null
     if (!text) return
+    input('[data-text-x]', textInspector).value = String(Math.round(text.x * FRAME_WIDTH_DP))
+    input('[data-text-y]', textInspector).value = String(Math.round(text.y * ASPECT_HEIGHT_DP[aspect]))
+    input('[data-text-w]', textInspector).value = String(Math.round(text.w * FRAME_WIDTH_DP))
+    input('[data-text-rotation]', textInspector).value = String(Math.round(text.rotation))
     selectEl('[data-text-font]', textInspector).value = text.font
     input('[data-text-size]', textInspector).value = String(text.sizeSp)
     input('[data-text-color]', textInspector).value = text.color
@@ -1282,7 +1359,84 @@ export function mountStudio(root: HTMLElement): void {
   frame.addEventListener('pointerup', endPointer)
   frame.addEventListener('pointercancel', endPointer)
 
+  // Drag a movable row to reorder the paint order (pointer-based so touch works); a plain click still selects.
+  // The dragged row rides with the pointer and the other rows slide out of its way, like Figma's layer list.
+  let layerDrag: { id: string; startY: number; active: boolean; row: HTMLElement; others: HTMLElement[]; mids: number[]; from: number; to: number } | null = null
+  let layerDragged = false
+  function movableRows(): HTMLElement[] {
+    return [...list.querySelectorAll<HTMLElement>('[data-layer].is-movable')]
+  }
+  function paintLayerDrag(drag: NonNullable<typeof layerDrag>): void {
+    const step = drag.row.offsetHeight + 1 // rows are 1px apart
+    drag.others.forEach((row, i) => {
+      // `i` indexes the list without the dragged row; rows between the hole and the drop slot slide toward the hole
+      const shift = i >= drag.from && i < drag.to ? -step : i < drag.from && i >= drag.to ? step : 0
+      row.style.transform = shift ? `translateY(${shift}px)` : ''
+    })
+  }
+  list.addEventListener('pointerdown', (event) => {
+    const target = event.target as HTMLElement
+    const row = target.closest<HTMLElement>('[data-layer].is-movable')
+    if (event.button !== 0 || !row?.dataset.layer || target.closest('button')) return
+    const rows = movableRows()
+    const from = rows.indexOf(row)
+    const others = rows.filter((item) => item !== row)
+    layerDrag = {
+      id: row.dataset.layer,
+      startY: event.clientY,
+      active: false,
+      row,
+      others,
+      // untransformed midpoints, measured once so the sliding rows do not move their own targets
+      mids: others.map((item) => {
+        const box = item.getBoundingClientRect()
+        return box.top + box.height / 2
+      }),
+      from,
+      to: from,
+    }
+    list.setPointerCapture(event.pointerId)
+    // no text selection while dragging
+    event.preventDefault()
+  })
+  list.addEventListener('pointermove', (event) => {
+    if (!layerDrag) return
+    if (!layerDrag.active) {
+      if (Math.abs(event.clientY - layerDrag.startY) < 4) return
+      layerDrag.active = true
+      layerDrag.row.classList.add('is-dragging')
+      list.classList.add('is-reordering')
+    }
+    layerDrag.row.style.transform = `translateY(${event.clientY - layerDrag.startY}px)`
+    // drop slot = how many other rows sit above the pointer
+    layerDrag.to = layerDrag.mids.filter((mid) => mid < event.clientY).length
+    paintLayerDrag(layerDrag)
+  })
+  function endLayerDrag(): void {
+    if (!layerDrag) return
+    const drag = layerDrag
+    layerDrag = null
+    drag.row.style.transform = ''
+    drag.row.classList.remove('is-dragging')
+    list.classList.remove('is-reordering')
+    drag.others.forEach((row) => (row.style.transform = ''))
+    if (!drag.active) return
+    layerDragged = true
+    if (drag.to === drag.from) return
+    const order = drag.others.map((row) => row.dataset.layer!)
+    order.splice(drag.to, 0, drag.id)
+    layout().layers = order.reverse()
+    commit()
+    renderSlots()
+  }
+  list.addEventListener('pointerup', endLayerDrag)
+  list.addEventListener('pointercancel', endLayerDrag)
+
   list.addEventListener('click', (event) => {
+    if (layerDragged) {
+      layerDragged = false
+      return
+    }
     const target = event.target as HTMLElement
     const row = target.closest('[data-layer]')
     if (!(row instanceof HTMLElement) || !row.dataset.layer) return
@@ -1328,6 +1482,25 @@ export function mountStudio(root: HTMLElement): void {
     })
   })
 
+  // Preview is view state only: the canvas paints like the app (placeholder photos, no handles) and ignores the pointer.
+  const previewButton = $('[data-preview]', root) as HTMLButtonElement
+  previewButton.addEventListener('click', () => {
+    const on = !frame.classList.contains('is-preview')
+    frame.classList.toggle('is-preview', on)
+    $('.canvas', root).classList.toggle('is-preview', on)
+    previewButton.classList.toggle('is-active', on)
+    previewButton.setAttribute('aria-pressed', String(on))
+    if (on) {
+      selection = null
+      renderSlots()
+      setStatus('preview · placeholder photos stand in for the day\'s pictures · click ▶ again to edit')
+      toast('info', 'preview mode · click ▶ again to edit')
+    } else {
+      setStatus('back to editing')
+      toast('info', 'edit mode')
+    }
+  })
+
   $('[data-add-slot]', root).addEventListener('click', addSlot)
   $('[data-delete-slot]', root).addEventListener('click', removeSelected)
   for (const which of STICKERS) {
@@ -1356,9 +1529,7 @@ export function mountStudio(root: HTMLElement): void {
       const next = button.dataset.aspect
       if (next !== 'story' && next !== 'post') return
       aspect = next
-      root.querySelectorAll('[data-aspect]').forEach((node) => {
-        node.classList.toggle('is-active', node === button)
-      })
+      paintAspect()
       selection = null
       seedFromOtherAspect()
       renderOverlay()
@@ -1491,9 +1662,24 @@ export function mountStudio(root: HTMLElement): void {
   // Sizes commit on `change` (blur / Enter), not `input`: re-rendering mid-typing would clamp "1" to the 14dp minimum under the cursor.
   inspector.addEventListener('change', (event) => {
     const slot = selected()
-    if (!slot || !(event.target instanceof HTMLInputElement) || !event.target.matches('[data-slot-w], [data-slot-h]')) return
-    const isW = event.target.matches('[data-slot-w]')
-    const dp = Number(event.target.value)
+    const field = event.target
+    if (!slot || !(field instanceof HTMLInputElement)) return
+    const value = Number(field.value)
+    if (field.matches('[data-slot-x], [data-slot-y], [data-slot-rotation], [data-slot-corner]')) {
+      if (Number.isFinite(value)) {
+        // Typed positions keep the box inside the canvas, like a drag would.
+        if (field.matches('[data-slot-x]')) slot.x = clamp(value / FRAME_WIDTH_DP, 0, 1 - slot.w)
+        else if (field.matches('[data-slot-y]')) slot.y = clamp(value / ASPECT_HEIGHT_DP[aspect], 0, 1 - slot.h)
+        else if (field.matches('[data-slot-rotation]')) slot.rotation = Math.round(clamp(value, -MAX_TILT, MAX_TILT))
+        else slot.cornerDp = Math.round(clamp(value, 0, MAX_CORNER))
+        commit()
+      }
+      renderSlots()
+      return
+    }
+    if (!field.matches('[data-slot-w], [data-slot-h]')) return
+    const isW = field.matches('[data-slot-w]')
+    const dp = value
     if (Number.isFinite(dp) && dp > 0) {
       // Typed sizes resize from the top-left corner, clamped to the canvas; the lock keeps the other side in ratio.
       const ratio = slot.w / slot.h
@@ -1503,6 +1689,40 @@ export function mountStudio(root: HTMLElement): void {
         if (isW) slot.h = clamp(slot.w / ratio, 0.04, 1 - slot.y)
         else slot.w = clamp(slot.h * ratio, 0.04, 1 - slot.x)
       }
+      commit()
+    }
+    renderSlots()
+  })
+
+  stickerInspector.addEventListener('change', (event) => {
+    const which = selectedSticker()
+    const sticker = which && layout()[which]
+    const field = event.target
+    if (!sticker || !(field instanceof HTMLInputElement)) return
+    const value = Number(field.value)
+    if (Number.isFinite(value)) {
+      if (field.matches('[data-sticker-x]')) sticker.x = clamp01(value / FRAME_WIDTH_DP)
+      else if (field.matches('[data-sticker-y]')) sticker.y = clamp01(value / ASPECT_HEIGHT_DP[aspect])
+      else if (field.matches('[data-sticker-size]')) {
+        sticker.sizeDp = Math.round(clamp(value, MIN_STICKER_SIZE_DP, MAX_STICKER_SIZE_DP))
+      } else if (field.matches('[data-sticker-rotation]')) sticker.rotation = Math.round(clamp(value, -MAX_TILT, MAX_TILT))
+      else return
+      clampStickerPosition(sticker)
+      commit()
+    }
+    renderSlots()
+  })
+
+  textInspector.addEventListener('change', (event) => {
+    const text = selectedText()
+    const field = event.target
+    if (!text || !(field instanceof HTMLInputElement) || !field.matches('[data-text-x], [data-text-y], [data-text-w], [data-text-rotation]')) return
+    const value = Number(field.value)
+    if (Number.isFinite(value)) {
+      if (field.matches('[data-text-x]')) text.x = clamp(value / FRAME_WIDTH_DP, 0, 1 - text.w)
+      else if (field.matches('[data-text-y]')) text.y = clamp01(value / ASPECT_HEIGHT_DP[aspect])
+      else if (field.matches('[data-text-w]')) text.w = clamp(value / FRAME_WIDTH_DP, MIN_TEXT_W, 1 - text.x)
+      else text.rotation = Math.round(clamp(value, -MAX_TILT, MAX_TILT))
       commit()
     }
     renderSlots()
@@ -1610,6 +1830,19 @@ export function mountStudio(root: HTMLElement): void {
       slotEl?.dataset.slotId ?? stickerEl?.dataset.sticker ?? textEl?.dataset.textId ?? (overlays[aspect] ? 'overlay' : null)
     if (selection == null) return
     renderSlots()
+    openContextMenu(event)
+  })
+  // Same menu from a layer row: right-click selects the row, then offers duplicate / reorder / delete for it.
+  list.addEventListener('contextmenu', (event) => {
+    const row = (event.target as HTMLElement).closest<HTMLElement>('[data-layer]')
+    if (!row?.dataset.layer) return
+    event.preventDefault()
+    selection = row.dataset.layer
+    renderSlots()
+    openContextMenu(event)
+  })
+  function openContextMenu(event: MouseEvent): void {
+    if (selection == null) return
     const inLayers = layout().layers.includes(selection)
     $('[data-ctx-action="duplicate"]', ctx).hidden = selected() == null
     $('[data-ctx-action="up"]', ctx).hidden = !inLayers
@@ -1619,7 +1852,7 @@ export function mountStudio(root: HTMLElement): void {
     const { width, height } = ctx.getBoundingClientRect()
     ctx.style.left = `${Math.min(event.clientX, window.innerWidth - width - 8)}px`
     ctx.style.top = `${Math.min(event.clientY, window.innerHeight - height - 8)}px`
-  })
+  }
   ctx.addEventListener('click', (event) => {
     const button = (event.target as HTMLElement).closest<HTMLElement>('[data-ctx-action]')
     ctx.hidden = true
@@ -1636,6 +1869,9 @@ export function mountStudio(root: HTMLElement): void {
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') ctx.hidden = true
   })
+
+  undoButton.addEventListener('click', undo)
+  redoButton.addEventListener('click', redo)
 
   $('[data-export]', root).addEventListener('click', () => {
     void exportPack()
@@ -1695,14 +1931,13 @@ export function mountStudio(root: HTMLElement): void {
     backgrounds.post = draft.backgrounds?.post ?? null
     iconFile = draft.icon
     syncId()
-    aspect = draft.aspect
-    root.querySelectorAll<HTMLElement>('[data-aspect]').forEach((node) => {
-      node.classList.toggle('is-active', node.dataset.aspect === aspect)
-    })
+    aspect = draft.aspect === 'post' ? 'post' : 'story'
+    paintAspect()
     selection = null
     resetHistory()
     renderOverlay()
     renderSlots()
+    savedLabel.textContent = `saved ${new Date(draft.savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
     toast('info', `restored your draft from ${new Date(draft.savedAt).toLocaleString()}`)
     setStatus('draft restored — "start over" clears it')
   }

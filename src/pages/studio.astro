@@ -26,206 +26,106 @@ import Logo from '../components/Logo.astro';
     />
   </head>
   <body>
-    <header class="studio-nav">
-      <a href="/" class="studio-nav__brand" aria-label="loggoo home"><Logo size={30} /></a>
-      <p class="studio-nav__title">frame studio</p>
-      <p class="studio-nav__note">export zip → commit to loggoo_asset</p>
-    </header>
-
-    <div id="studio" class="studio">
-      <aside class="studio__side">
-        <label class="field">
-          <span>name · en</span>
-          <input name="nameEn" type="text" placeholder="scrapbook" autocomplete="off" />
-        </label>
-        <label class="field">
-          <span>name · vi</span>
-          <input name="nameVi" type="text" placeholder="sổ dán" autocomplete="off" />
-        </label>
-        <div class="studio__row">
-          <p class="studio__id">id · <code data-id>—</code></p>
-          <button class="btn btn--ghost btn--sm" type="button" data-reset>start over</button>
-        </div>
-        <label class="check">
-          <input name="premium" type="checkbox" checked />
-          <span>loggoo plus</span>
-        </label>
-        <label class="field">
-          <span>schema · app version</span>
-          <select name="schemaVersion">
-            <option value="4">v4 · app 1.5.1 and up</option>
-            <option value="3">v3 · app 1.5.0</option>
-            <option value="2">v2 · app 1.4.1 and below</option>
-          </select>
-        </label>
-        <p class="studio__hint" data-schema-hint hidden>v3 has no background, logo, or text width / rotation / max lines / align. v2 also paints in a fixed order: overlay, photos, mood.</p>
-
-        <div class="studio__block">
-          <div class="studio__row">
-            <p class="studio__label">overlay for this aspect</p>
-            <button class="btn btn--ghost btn--sm" type="button" data-remove-overlay hidden>remove overlay</button>
+    <div id="studio" class="studio" data-selection="none">
+      <header class="topbar">
+        <div class="topbar__left">
+          <a href="/" class="topbar__brand" aria-label="loggoo home"><Logo size={24} /></a>
+          <div class="topbar__file">
+            <input class="topbar__name" name="nameEn" type="text" placeholder="pack name · en" autocomplete="off" aria-label="pack name (english)" />
+            <p class="topbar__id">id · <code data-id>—</code> <span class="topbar__saved" data-saved></span></p>
           </div>
-          <p class="studio__hint">png, jpg, or jpeg. use png if the holes should be transparent.</p>
-          <label class="file">
-            <input data-overlay-file type="file" accept="image/png,image/jpeg,.png,.jpg,.jpeg" />
-            <span>upload png / jpg</span>
+          <div class="tools tools--history" role="group" aria-label="history">
+            <button class="tool" type="button" data-undo disabled title="undo · ⌘/Ctrl Z" aria-label="undo">
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7.5 5.5L4 9l3.5 3.5M4.5 9h7a4 4 0 0 1 0 8H9" fill="none" /></svg>
+            </button>
+            <button class="tool" type="button" data-redo disabled title="redo · ⇧⌘/Ctrl Z" aria-label="redo">
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M12.5 5.5L16 9l-3.5 3.5M15.5 9h-7a4 4 0 0 0 0 8H11" fill="none" /></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="tools" role="toolbar" aria-label="tools">
+          <button class="tool is-active" type="button" data-mode="select" title="select · click the frame, a slot, a sticker, or the note" aria-label="select">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 3l11 7.5-4.8 1 2.6 4.6-2 1.1-2.6-4.6L6 16z" /></svg>
+          </button>
+          <button class="tool" type="button" data-mode="draw" title="draw photo slot · drag a hole on the canvas" aria-label="draw photo slot">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3.5" y="3.5" width="13" height="13" rx="1.5" fill="none" /><path d="M6.5 13l3-3.5 2 2.2 1.6-1.6 2.4 2.9" fill="none" /></svg>
+          </button>
+          <button class="tool" type="button" data-add-slot title="add photo slot · centred default box" aria-label="add photo slot">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12" fill="none" /></svg>
+          </button>
+          <span class="tools__sep" aria-hidden="true"></span>
+          <button class="tool" type="button" data-add-text title="add note text" aria-label="add note text">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 5h12M10 5v11M7.5 16h5" fill="none" /></svg>
+          </button>
+          <button class="tool" type="button" data-add-sticker="mood" title="add mood face" aria-label="add mood face">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7" fill="none" /><path d="M6.8 8.2c.6-1 1.8-1 2.4 0M10.8 8.2c.6-1 1.8-1 2.4 0M7 12c1.4 2 4.6 2 6 0" fill="none" /></svg>
+          </button>
+          <button class="tool" type="button" data-add-sticker="logo" data-min-schema="4" title="add loggoo icon" aria-label="add loggoo icon">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="7.8" cy="11" r="4" fill="none" /><circle cx="12.2" cy="11" r="4" fill="none" /><circle cx="15" cy="5" r="1.8" stroke="none" /></svg>
+          </button>
+        </div>
+
+        <div class="topbar__right">
+          <div class="seg" aria-label="canvas helpers">
+            <button type="button" data-helper="grid" aria-pressed="false" title="20dp grid">grid</button>
+            <button type="button" data-helper="safe" aria-pressed="false" title="safe area">safe</button>
+          </div>
+          <button class="tool tool--preview" type="button" data-preview aria-pressed="false" title="preview · render like the app, with placeholder photos" aria-label="preview">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 4.5v11l9-5.5z" /></svg>
+          </button>
+          <p class="topbar__zoom" title="⌘/Ctrl + · − · 0 or ⌘/Ctrl + wheel / pinch to zoom · ⌘/Ctrl Z undo · ⇧⌘/Ctrl Z redo"><span data-zoom>100%</span></p>
+          <button class="btn btn--ghost btn--sm" type="button" data-reset>start over</button>
+          <button class="btn btn--primary btn--sm" type="button" data-export>export zip</button>
+        </div>
+      </header>
+
+      <aside class="panel panel--left">
+        <section class="panel__section">
+          <h2 class="panel__title">pages</h2>
+          <div class="pages" role="tablist" aria-label="frame aspect">
+            <button class="page is-active" type="button" data-aspect="story"><span class="page__dot"></span>story · 9:16</button>
+            <button class="page" type="button" data-aspect="post"><span class="page__dot"></span>post · 4:5</button>
+          </div>
+        </section>
+
+        <section class="panel__section">
+          <h2 class="panel__title">pack</h2>
+          <div class="panel__body">
+          <label class="field">
+            <span>name · vi</span>
+            <input name="nameVi" type="text" placeholder="sổ dán" autocomplete="off" />
           </label>
+          <label class="check">
+            <input name="premium" type="checkbox" checked />
+            <span>loggoo plus</span>
+          </label>
+          <label class="field">
+            <span>schema · app version</span>
+            <select name="schemaVersion">
+              <option value="4">v4 · app 1.5.1 and up</option>
+              <option value="3">v3 · app 1.5.0</option>
+              <option value="2">v2 · app 1.4.1 and below</option>
+            </select>
+          </label>
+          <p class="panel__hint" data-schema-hint hidden>v3 has no background, logo, or text width / rotation / max lines / align. v2 also paints in a fixed order: overlay, photos, mood.</p>
           <label class="file">
             <input data-icon-file type="file" accept="image/png,image/jpeg,.png,.jpg,.jpeg" />
             <span>rail icon (optional)</span>
           </label>
-          <p class="studio__hint">icon: square png, 256×256 recommended (min 128), transparent background, line art with ~2px strokes at 34px — it shows at 40dp in the rail.</p>
-          <p class="studio__hint" data-icon-status></p>
-        </div>
-
-        <div class="studio__block" data-min-schema="4">
-          <div class="studio__row">
-            <p class="studio__label">background · optional</p>
-            <button class="btn btn--ghost btn--sm" type="button" data-remove-background hidden>remove</button>
+          <p class="panel__hint">square png, 256×256 recommended (min 128), transparent background, ~2px line art at 34px — shows at 40dp in the rail.</p>
+          <p class="panel__hint" data-icon-status></p>
           </div>
-          <p class="studio__hint">paints under everything for this aspect. a colour or a full-bleed image; picking one replaces the other.</p>
-          <div class="studio__row studio__row--start">
-            <label class="swatch-pick">
-              <input data-background-color type="color" value="#FBF6F0" aria-label="background colour" />
-              <span>colour</span>
-            </label>
-            <label class="file file--inline">
-              <input data-background-file type="file" accept="image/png,image/jpeg,.png,.jpg,.jpeg" />
-              <span>image</span>
-            </label>
-          </div>
-          <p class="studio__hint" data-background-status>none · the app paints its own surface</p>
-        </div>
-
-        <div class="studio__block">
-          <div class="studio__row">
-            <p class="studio__label">mood face · optional</p>
-            <button class="btn btn--ghost btn--sm" type="button" data-add-sticker="mood">add mood face</button>
-            <button class="btn btn--ghost btn--sm" type="button" data-delete-sticker="mood" hidden>delete mood</button>
-          </div>
-          <p class="studio__hint" data-sticker-status="mood">not used in this aspect</p>
-        </div>
-
-        <div class="studio__block" data-min-schema="4">
-          <div class="studio__row">
-            <p class="studio__label">loggoo icon · optional</p>
-            <button class="btn btn--ghost btn--sm" type="button" data-add-sticker="logo">add loggoo icon</button>
-            <button class="btn btn--ghost btn--sm" type="button" data-delete-sticker="logo" hidden>delete icon</button>
-          </div>
-          <p class="studio__hint" data-sticker-status="logo">not used in this aspect</p>
-          <div class="aspect-toggle aspect-toggle--wrap" role="group" aria-label="logo style">
-            <button type="button" data-logo-style="tile" hidden title="mark on the dark brand tile">tile</button>
-            <button type="button" data-logo-style="dark" hidden title="bare brown mark · for light artwork">dark mark</button>
-            <button type="button" data-logo-style="light" hidden title="bare cream mark · for dark artwork">light mark</button>
-          </div>
-        </div>
-
-        <div class="studio__block">
-          <div class="studio__row">
-            <p class="studio__label">note text · optional</p>
-            <button class="btn btn--ghost btn--sm" type="button" data-add-text>add note text</button>
-          </div>
-          <p class="studio__hint" data-min-schema="4">the day's note, wrapped inside a box you drag, widen, and rotate on the canvas. always paints on top.</p>
-          <p class="studio__hint" data-max-schema="3">the day's note at a point on the canvas. always paints on top.</p>
-          <div class="inspector" data-text-inspector hidden>
-            <label class="field">
-              <span>font</span>
-              <select data-text-font>
-                <option value="poppins">poppins</option>
-                <option value="caveat">caveat</option>
-                <option value="sacramento">sacramento</option>
-                <option value="baloo">baloo</option>
-                <option value="playfair">playfair</option>
-              </select>
-            </label>
-            <div class="inspector__grid">
-              <label class="field">
-                <span>size · sp</span>
-                <input data-text-size type="number" min="4" max="200" step="1" />
-              </label>
-              <label class="field" data-min-schema="4">
-                <span>max lines</span>
-                <input data-text-lines type="number" min="1" max="20" step="1" />
-              </label>
-            </div>
-            <div class="inspector__grid">
-              <label class="field" data-min-schema="4">
-                <span>align</span>
-                <select data-text-align>
-                  <option value="start">start</option>
-                  <option value="center">center</option>
-                  <option value="end">end</option>
-                </select>
-              </label>
-              <label class="field">
-                <span>colour</span>
-                <input data-text-color type="color" />
-              </label>
-            </div>
-            <button class="btn btn--ghost btn--sm" type="button" data-delete-text>delete note text</button>
-          </div>
-        </div>
-
-        <div class="studio__block">
-          <div class="studio__row">
-            <p class="studio__label">layers · top first</p>
-            <button class="btn btn--ghost btn--sm" type="button" data-add-slot>add slot</button>
-          </div>
-          <p class="studio__hint">click a row to select it · ▲ ▼ change what paints on top. note text is pinned above, background below.</p>
+        </section>
+        <section class="panel__section panel__section--grow">
+          <h2 class="panel__title">layers</h2>
+          <p class="panel__hint">top first · drag or ▲ ▼ to reorder · note pinned above, background below</p>
           <div class="layer-list" data-layer-list></div>
-          <div class="inspector" data-inspector hidden>
-            <label class="field">
-              <span>photo index</span>
-              <input data-slot-photo type="number" min="1" step="1" />
-            </label>
-            <div class="studio__row">
-              <label class="field">
-                <span>width · dp</span>
-                <input data-slot-w type="number" min="1" step="1" />
-              </label>
-              <label class="field">
-                <span>height · dp</span>
-                <input data-slot-h type="number" min="1" step="1" />
-              </label>
-            </div>
-            <label class="check">
-              <input data-slot-lock type="checkbox" />
-              <span>lock aspect ratio</span>
-            </label>
-            <button class="btn btn--ghost btn--sm" type="button" data-delete-slot>delete slot</button>
-          </div>
-        </div>
+        </section>
 
-        <div class="studio__block">
-          <button class="btn btn--primary" type="button" data-export>export zip</button>
-          <p class="studio__hint" data-status></p>
-          <label class="field">
-            <span>catalog.json snippet</span>
-            <textarea data-snippet rows="8" readonly placeholder="appears here after a successful export"></textarea>
-          </label>
-        </div>
       </aside>
 
-      <section class="studio__stage">
-        <div class="studio__toolbar">
-          <div class="aspect-toggle" role="tablist" aria-label="frame aspect">
-            <button class="is-active" type="button" data-aspect="story">story 9:16</button>
-            <button type="button" data-aspect="post">post 4:5</button>
-          </div>
-          <div class="aspect-toggle" role="tablist" aria-label="canvas mode">
-            <button class="is-active" type="button" data-mode="select">select</button>
-            <button type="button" data-mode="draw">draw slot</button>
-          </div>
-          <div class="aspect-toggle" aria-label="canvas helpers">
-            <button type="button" data-helper="grid" aria-pressed="false">grid</button>
-            <button type="button" data-helper="safe" aria-pressed="false">safe area</button>
-          </div>
-          <p class="studio__zoom" title="⌘/Ctrl + · − · 0 or ⌘/Ctrl + wheel / pinch to zoom · ⌘/Ctrl Z undo · ⇧⌘/Ctrl Z redo">zoom <span data-zoom>100%</span></p>
-        </div>
-        <p class="studio__stage-hint" data-mode-hint>
-          select: click the frame, a slot, or the mood · move / resize · top knob rotates · inner dot rounds photo corners ·
-          <span data-aspect-label>9:16 story</span>
-        </p>
+      <section class="canvas">
         <div class="stage">
           <div class="frame" data-frame data-aspect="story">
             <p class="frame__empty" data-overlay-empty>upload a story overlay</p>
@@ -241,7 +141,133 @@ import Logo from '../components/Logo.astro';
             <div class="frame__guide frame__guide--h" data-guide="h" hidden></div>
           </div>
         </div>
+        <p class="canvas__status" data-mode-hint>select: click the frame, a slot, a sticker, or the note · move / resize · top knob rotates · inner dot rounds photo corners · <span data-aspect-label>9:16 story</span></p>
       </section>
+
+      <aside class="panel panel--right">
+        <h2 class="panel__title panel__title--tab">design</h2>
+
+        <section class="panel__section" data-panel="aspect">
+          <div class="panel__row">
+            <h3 class="panel__label">overlay</h3>
+            <button class="btn btn--ghost btn--xs" type="button" data-remove-overlay hidden>remove</button>
+          </div>
+          <label class="file">
+            <input data-overlay-file type="file" accept="image/png,image/jpeg,.png,.jpg,.jpeg" />
+            <span>upload png / jpg</span>
+          </label>
+          <p class="panel__hint">png keeps the holes transparent. optional on v4.</p>
+        </section>
+
+        <section class="panel__section" data-panel="aspect" data-min-schema="4">
+          <div class="panel__row">
+            <h3 class="panel__label">background</h3>
+            <button class="btn btn--ghost btn--xs" type="button" data-remove-background hidden>remove</button>
+          </div>
+          <div class="panel__row panel__row--start">
+            <label class="swatch-pick">
+              <input data-background-color type="color" value="#FBF6F0" aria-label="background colour" />
+              <span>colour</span>
+            </label>
+            <label class="file file--inline">
+              <input data-background-file type="file" accept="image/png,image/jpeg,.png,.jpg,.jpeg" />
+              <span>image</span>
+            </label>
+          </div>
+          <p class="panel__hint" data-background-status>none · the app paints its own surface</p>
+        </section>
+
+        <section class="panel__section inspector" data-panel="slot" data-inspector hidden>
+          <h3 class="panel__label">photo slot</h3>
+          <div class="props">
+            <label class="prop"><span>X</span><input data-slot-x type="number" step="1" aria-label="x · dp" /></label>
+            <label class="prop"><span>Y</span><input data-slot-y type="number" step="1" aria-label="y · dp" /></label>
+            <label class="prop"><span>W</span><input data-slot-w type="number" min="1" step="1" aria-label="width · dp" /></label>
+            <label class="prop"><span>H</span><input data-slot-h type="number" min="1" step="1" aria-label="height · dp" /></label>
+            <label class="prop"><span>↻</span><input data-slot-rotation type="number" min="-45" max="45" step="1" aria-label="rotation · degrees" /></label>
+            <label class="prop"><span>◜</span><input data-slot-corner type="number" min="0" max="24" step="1" aria-label="corner radius · dp" /></label>
+          </div>
+          <label class="check">
+            <input data-slot-lock type="checkbox" />
+            <span>lock aspect ratio</span>
+          </label>
+          <h3 class="panel__label">photo</h3>
+          <div class="props">
+            <label class="prop"><span>#</span><input data-slot-photo type="number" min="1" step="1" aria-label="photo index" /></label>
+          </div>
+          <p class="panel__hint">dp on the 360dp design canvas · rotation −45..45 · radius 0..24</p>
+          <button class="btn btn--ghost btn--xs is-danger" type="button" data-delete-slot>delete slot</button>
+        </section>
+
+        <section class="panel__section inspector" data-panel="sticker" data-sticker-inspector hidden>
+          <h3 class="panel__label"><span data-sticker-status="mood">mood face</span><span data-sticker-status="logo">loggoo icon</span></h3>
+          <div class="props">
+            <label class="prop"><span>X</span><input data-sticker-x type="number" step="1" aria-label="x · dp" /></label>
+            <label class="prop"><span>Y</span><input data-sticker-y type="number" step="1" aria-label="y · dp" /></label>
+            <label class="prop"><span>S</span><input data-sticker-size type="number" min="16" max="180" step="1" aria-label="size · dp" /></label>
+            <label class="prop"><span>↻</span><input data-sticker-rotation type="number" min="-45" max="45" step="1" aria-label="rotation · degrees" /></label>
+          </div>
+          <div class="seg seg--full" role="group" aria-label="logo style">
+            <button type="button" data-logo-style="tile" hidden title="mark on the dark brand tile">tile</button>
+            <button type="button" data-logo-style="dark" hidden title="bare brown mark · for light artwork">dark</button>
+            <button type="button" data-logo-style="light" hidden title="bare cream mark · for dark artwork">light</button>
+          </div>
+          <p class="panel__hint">the app draws the day's top mood here; the logo previews the chosen style.</p>
+          <button class="btn btn--ghost btn--xs is-danger" type="button" data-delete-sticker="mood" hidden>delete mood face</button>
+          <button class="btn btn--ghost btn--xs is-danger" type="button" data-delete-sticker="logo" hidden>delete loggoo icon</button>
+        </section>
+
+        <section class="panel__section inspector" data-panel="text" data-text-inspector hidden>
+          <h3 class="panel__label">note text</h3>
+          <div class="props">
+            <label class="prop"><span>X</span><input data-text-x type="number" step="1" aria-label="x · dp" /></label>
+            <label class="prop"><span>Y</span><input data-text-y type="number" step="1" aria-label="y · dp" /></label>
+            <label class="prop" data-min-schema="4"><span>W</span><input data-text-w type="number" min="18" step="1" aria-label="width · dp" /></label>
+            <label class="prop" data-min-schema="4"><span>↻</span><input data-text-rotation type="number" min="-45" max="45" step="1" aria-label="rotation · degrees" /></label>
+          </div>
+          <h3 class="panel__label">typography</h3>
+          <label class="field">
+            <span>font</span>
+            <select data-text-font>
+              <option value="poppins">poppins</option>
+              <option value="caveat">caveat</option>
+              <option value="sacramento">sacramento</option>
+              <option value="baloo">baloo</option>
+              <option value="playfair">playfair</option>
+            </select>
+          </label>
+          <div class="props">
+            <label class="prop"><span>sp</span><input data-text-size type="number" min="4" max="200" step="1" aria-label="size · sp" /></label>
+            <label class="prop" data-min-schema="4"><span>≡</span><input data-text-lines type="number" min="1" max="20" step="1" aria-label="max lines" /></label>
+          </div>
+          <div class="props">
+            <label class="field" data-min-schema="4">
+              <span>align</span>
+              <select data-text-align>
+                <option value="start">start</option>
+                <option value="center">center</option>
+                <option value="end">end</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>colour</span>
+              <input data-text-color type="color" />
+            </label>
+          </div>
+          <p class="panel__hint" data-min-schema="4">the day's note wraps inside the box and is cut with an ellipsis after max lines. always paints on top.</p>
+          <p class="panel__hint" data-max-schema="3">the day's note at a point on the canvas. always paints on top.</p>
+          <button class="btn btn--ghost btn--xs is-danger" type="button" data-delete-text>delete note text</button>
+        </section>
+
+        <section class="panel__section" data-panel="export">
+          <h3 class="panel__label">export</h3>
+          <p class="panel__hint" data-status>export zip → unzip into loggoo_asset/frames/&lt;id&gt;/</p>
+          <label class="field">
+            <span>catalog.json snippet</span>
+            <textarea data-snippet rows="7" readonly placeholder="appears here after a successful export"></textarea>
+          </label>
+        </section>
+      </aside>
     </div>
 
     <div class="ctx" data-ctx role="menu" hidden>
@@ -266,106 +292,246 @@ import Logo from '../components/Logo.astro';
     height: 100%;
     overflow: hidden;
   }
-  body:has(.studio) {
-    display: flex;
-    flex-direction: column;
-    overscroll-behavior: none;
-  }
-  .studio-nav {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 12px 22px;
-    border-bottom: 1px solid var(--lg-outline-variant);
-    background: color-mix(in srgb, var(--lg-background) 88%, transparent);
-    flex: none;
-  }
-  .studio-nav__title {
-    margin: 0;
-    font-family: var(--lg-font-display);
-    font-weight: 700;
-    font-size: 16px;
-  }
-  .studio-nav__note {
-    margin: 0 0 0 auto;
-    font-size: 12.5px;
-    color: var(--lg-on-surface-muted);
-  }
+  body:has(.studio) { overscroll-behavior: none; }
+
+  /* Figma-style shell: 48px toolbar, then layers | canvas | design */
   .studio {
-    flex: 1;
-    min-height: 0;
+    height: 100%;
     display: grid;
-    grid-template-columns: 320px minmax(0, 1fr);
-  }
-  .studio__side {
-    padding: 20px 18px 32px;
-    border-right: 1px solid var(--lg-outline-variant);
+    grid-template-columns: 240px minmax(0, 1fr) 260px;
+    grid-template-rows: 48px minmax(0, 1fr);
+    grid-template-areas: 'top top top' 'left canvas right';
     background: var(--lg-surface);
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    overflow: auto;
-    min-height: 0;
-    scrollbar-gutter: stable;
+    color: var(--lg-on-background);
   }
-  .studio__side > * { flex-shrink: 0; }
   /* Older schemas never had these controls: v3 lacks background / logo / text box fields, v2 also lacks layer order. */
   .studio[data-schema="2"] [data-min-schema="3"],
   .studio[data-schema="2"] [data-min-schema="4"],
   .studio[data-schema="3"] [data-min-schema="4"],
   .studio[data-schema="4"] [data-max-schema="3"] { display: none !important; }
-  .studio__stage {
-    padding: 18px 22px 22px;
+  /* The design panel shows what the selection needs: aspect settings when nothing (or the frame / background) is picked. */
+  .studio:not([data-selection="none"]):not([data-selection="frame"]):not([data-selection="background"]) [data-panel="aspect"],
+  .studio:not([data-selection="slot"]) [data-panel="slot"],
+  .studio:not([data-selection="sticker"]) [data-panel="sticker"],
+  .studio:not([data-selection="text"]) [data-panel="text"] { display: none !important; }
+
+  .topbar {
+    grid-area: top;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 12px;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--lg-outline-variant);
+    background: var(--lg-surface);
+    min-width: 0;
+  }
+  .topbar__left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .topbar__brand { display: inline-flex; flex: none; }
+  .topbar__file { display: flex; flex-direction: column; min-width: 0; }
+  .topbar__name {
+    font: inherit;
+    font-family: var(--lg-font-display);
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--lg-on-background);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    padding: 2px 6px;
+    margin: 0 -6px;
+    width: 220px;
+    max-width: 100%;
+  }
+  .topbar__name:hover { border-color: var(--lg-outline-variant); }
+  .topbar__name:focus { outline: none; border-color: var(--lg-secondary); background: var(--lg-background); }
+  .topbar__name.is-invalid { border-color: var(--lg-error); }
+  .topbar__id { margin: 0; font-size: 11px; font-weight: 700; color: var(--lg-on-surface-muted); white-space: nowrap; }
+  .topbar__saved { margin-left: 6px; font-weight: 600; color: var(--lg-on-surface-subtle); }
+  .topbar__saved:empty { display: none; }
+  .tools--history { flex: none; }
+  .tool:disabled { opacity: .3; cursor: default; background: transparent; }
+  .topbar__id code { font-family: ui-monospace, monospace; font-weight: 600; color: var(--lg-on-surface-variant); }
+  .topbar__right { display: flex; align-items: center; justify-content: flex-end; gap: 10px; min-width: 0; }
+  .topbar__zoom { margin: 0; font-size: 12.5px; font-weight: 700; color: var(--lg-on-surface-muted); cursor: help; }
+
+  .tools {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 3px;
+    border-radius: 12px;
+    background: var(--lg-surface-dim);
+  }
+  .tools__sep { width: 1px; height: 20px; margin: 0 4px; background: var(--lg-outline-variant); }
+  .tools__sep:not(:has(~ .tool:not([hidden]))) { display: none; }
+  .tool {
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--lg-on-surface-variant);
+    cursor: pointer;
+  }
+  .tool svg { width: 20px; height: 20px; fill: currentColor; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .tool:hover { background: var(--lg-surface); color: var(--lg-on-background); }
+  .tool.is-active { background: var(--lg-on-background); color: var(--lg-background); }
+  .tool--preview { background: var(--lg-surface-dim); }
+  .tool--preview.is-active { background: var(--lg-primary); color: var(--lg-on-primary); }
+
+  .seg {
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+    border-radius: 10px;
+    background: var(--lg-surface-dim);
+  }
+  .seg--full { display: flex; }
+  .seg--full:not(:has(button:not([hidden]))) { display: none; }
+  .seg--full button { flex: 1; }
+  .seg button {
+    border: 0;
+    background: transparent;
+    padding: 5px 10px;
+    border-radius: 8px;
+    font-family: var(--lg-font-display);
+    font-weight: 700;
+    font-size: 12.5px;
+    color: var(--lg-on-surface-variant);
+    cursor: pointer;
+  }
+  .seg button.is-active { background: var(--lg-surface); color: var(--lg-on-background); }
+
+  .panel {
     display: flex;
     flex-direction: column;
-    min-width: 0;
     min-height: 0;
-    overflow: hidden;
+    overflow: auto;
+    background: var(--lg-surface);
+    scrollbar-gutter: stable;
   }
-  .studio__block { display: flex; flex-direction: column; gap: 10px; }
-  .studio__row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-  .studio__row > .field { flex: 1; min-width: 0; }
-  .studio__label {
+  .panel--left { grid-area: left; border-right: 1px solid var(--lg-outline-variant); }
+  .panel--right { grid-area: right; border-left: 1px solid var(--lg-outline-variant); }
+  .panel__section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    border-bottom: 1px solid var(--lg-outline-variant);
+    flex-shrink: 0;
+  }
+  .panel__section--grow { flex: 1; }
+  .panel__title {
     margin: 0;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
     letter-spacing: .6px;
     text-transform: uppercase;
     color: var(--lg-on-surface-muted);
   }
-  .studio__hint {
+  .panel__title--tab {
+    padding: 14px 12px 10px;
+    border-bottom: 1px solid var(--lg-outline-variant);
+    color: var(--lg-on-background);
+  }
+  .panel__body { display: flex; flex-direction: column; gap: 10px; }
+  .panel__label {
     margin: 0;
-    font-size: 13px;
-    color: var(--lg-on-surface-subtle);
-    line-height: 1.45;
-    min-height: 1.45em;
-  }
-  .studio__id {
-    margin: -4px 0 0;
-    font-size: 12.5px;
+    font-size: 12px;
     font-weight: 700;
-    color: var(--lg-on-surface-muted);
-  }
-  .studio__id code {
-    font-family: ui-monospace, monospace;
-    font-weight: 600;
     color: var(--lg-on-surface-variant);
   }
-  .studio__toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-  .studio__zoom {
-    margin: 0 0 0 auto;
-    font-size: 12.5px;
-    font-weight: 700;
-    color: var(--lg-on-surface-muted);
-    cursor: help;
-  }
-  .studio__stage-hint {
-    margin: 10px 0 0;
-    font-size: 13px;
+  .panel__row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .panel__row--start { justify-content: flex-start; gap: 12px; }
+  .panel__hint {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.4;
     color: var(--lg-on-surface-subtle);
   }
-  .field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 700; color: var(--lg-on-surface-variant); }
-  .field em { font-style: normal; font-weight: 600; color: var(--lg-on-surface-subtle); float: right; }
+  .btn--xs { padding: 5px 10px; border-radius: 10px; font-size: 12px; align-self: flex-start; }
+  .btn--xs.is-danger { color: var(--lg-error); }
+
+  .pages { display: flex; flex-direction: column; gap: 2px; }
+  .page {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: 0;
+    background: transparent;
+    padding: 6px 8px;
+    border-radius: 8px;
+    font-family: var(--lg-font-display);
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--lg-on-surface-variant);
+    text-align: left;
+    cursor: pointer;
+  }
+  .page:hover { background: var(--lg-surface-dim); }
+  .page.is-active { background: var(--lg-primary-container); color: var(--lg-on-background); }
+  .page__dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .35; }
+  .page.is-active .page__dot { opacity: 1; background: var(--lg-primary); }
+
+  .canvas {
+    grid-area: canvas;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    background: var(--lg-surface-dim);
+  }
+  .canvas__status {
+    margin: 0;
+    padding: 6px 14px;
+    font-size: 11.5px;
+    color: var(--lg-on-surface-subtle);
+    border-top: 1px solid var(--lg-outline-variant);
+    background: var(--lg-surface);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Figma-style property fields: label chip inside the box */
+  .props { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .prop {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    padding: 0 8px;
+    height: 32px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: var(--lg-background);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--lg-on-surface-muted);
+  }
+  .prop:hover { border-color: var(--lg-outline-variant); }
+  .prop:focus-within { border-color: var(--lg-secondary); }
+  .prop > span { flex: none; min-width: 12px; text-align: center; }
+  .prop input {
+    flex: 1;
+    min-width: 0;
+    width: 100%;
+    border: 0;
+    background: transparent;
+    font: inherit;
+    font-weight: 600;
+    color: var(--lg-on-background);
+    padding: 0;
+    -moz-appearance: textfield;
+  }
+  .prop input:focus { outline: none; }
+  .prop input::-webkit-outer-spin-button, .prop input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+  .field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 700; color: var(--lg-on-surface-variant); min-width: 0; }
   .field input[type="text"],
   .field input[type="number"],
   .field select,
@@ -374,16 +540,102 @@ import Logo from '../components/Logo.astro';
     font-weight: 600;
     color: var(--lg-on-background);
     background: var(--lg-background);
-    border: 1px solid var(--lg-outline);
-    border-radius: 14px;
-    padding: 10px 12px;
+    border: 1px solid var(--lg-outline-variant);
+    border-radius: 8px;
+    padding: 6px 8px;
+    min-height: 32px;
+    width: 100%;
   }
-  .field textarea { font-family: ui-monospace, monospace; font-size: 11.5px; font-weight: 500; resize: vertical; }
+  .field input[type="color"] {
+    width: 100%;
+    height: 32px;
+    padding: 2px;
+    border: 1px solid var(--lg-outline-variant);
+    border-radius: 8px;
+    background: var(--lg-background);
+    cursor: pointer;
+  }
+  .field textarea { font-family: ui-monospace, monospace; font-size: 11px; font-weight: 500; resize: vertical; }
   .field input.is-invalid,
   .field textarea.is-invalid {
     border-color: var(--lg-error);
     background: color-mix(in srgb, var(--lg-error) 8%, var(--lg-background));
   }
+  .check { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 700; color: var(--lg-on-surface-variant); }
+  .check input { accent-color: var(--lg-secondary); }
+  .file { position: relative; }
+  .file--inline { flex: 1; }
+  .file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .file span {
+    display: flex; justify-content: center;
+    padding: 7px 10px; border-radius: 8px;
+    border: 1px dashed var(--lg-outline);
+    background: var(--lg-background);
+    font-size: 12.5px; font-weight: 700;
+    color: var(--lg-on-primary-container);
+  }
+  .file:hover span { border-color: var(--lg-secondary); }
+  .swatch-pick { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+  .swatch-pick input[type="color"] {
+    width: 32px; height: 32px; padding: 0;
+    border: 1px solid var(--lg-outline-variant);
+    border-radius: 8px;
+    background: transparent;
+    cursor: pointer;
+  }
+  .inspector { gap: 8px; }
+  .inspector[hidden] { display: none; }
+  .inspector .panel__label + .props { margin-top: -2px; }
+
+  .layer-list { display: flex; flex-direction: column; gap: 1px; margin: 0 -6px; touch-action: none; user-select: none; -webkit-user-select: none; }
+  .layer-row.is-movable { cursor: grab; }
+  .layer-row.is-dragging {
+    position: relative;
+    z-index: 2;
+    opacity: .9;
+    cursor: grabbing;
+    pointer-events: none;
+    background: var(--lg-surface);
+    box-shadow: 0 8px 20px -10px rgba(74, 55, 40, .5), 0 0 0 1px var(--lg-outline-variant);
+  }
+  .layer-list.is-reordering .layer-row:not(.is-dragging) { transition: transform .12s ease; }
+  @media (prefers-reduced-motion: reduce) { .layer-list.is-reordering .layer-row { transition: none; } }
+  .layer-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    border: 0;
+    background: transparent;
+    border-radius: 6px;
+    padding: 5px 4px 5px 8px;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--lg-on-background);
+    cursor: pointer;
+  }
+  .layer-row:hover { background: var(--lg-surface-dim); }
+  .layer-row.is-selected { background: var(--lg-primary-container); }
+  .layer-row.is-missing { color: var(--lg-on-surface-subtle); }
+  .layer-row.is-pinned .layer-row__name { font-style: italic; }
+  .layer-row__pin { font-size: 10px; font-weight: 700; letter-spacing: .04em; color: var(--lg-on-surface-subtle); padding: 0 4px; }
+  .layer-row__swatch {
+    width: 12px; height: 12px; border-radius: 3px;
+    background: var(--swatch, var(--lg-surface-dim));
+    box-shadow: inset 0 0 0 1px rgba(74, 55, 40, .25);
+    flex: none;
+  }
+  .layer-row__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .layer-row__tools { display: flex; gap: 0; opacity: 0; }
+  .layer-row:hover .layer-row__tools, .layer-row.is-selected .layer-row__tools, .layer-row:focus-within .layer-row__tools { opacity: 1; }
+  .layer-row__tools button {
+    border: 0; background: transparent;
+    width: 22px; height: 22px; border-radius: 6px;
+    font-size: 10px; color: var(--lg-on-surface-variant); cursor: pointer;
+  }
+  .layer-row__tools button:hover:not(:disabled) { background: var(--lg-surface); }
+  .layer-row__tools button:disabled { opacity: .3; cursor: default; }
+
   .ctx {
     position: fixed;
     /* above the lifted selection (z 100) and the rubber band (z 200), which sort at the root since .stage makes no stacking context */
@@ -397,47 +649,30 @@ import Logo from '../components/Logo.astro';
     box-shadow: 0 14px 30px -14px rgba(74, 55, 40, .5), 0 0 0 1px color-mix(in srgb, var(--lg-secondary) 30%, transparent);
   }
   .ctx button {
-    display: flex;
-    justify-content: space-between;
-    gap: 16px;
-    border: 0;
-    background: transparent;
-    padding: 8px 10px;
-    border-radius: 8px;
+    display: flex; justify-content: space-between; gap: 16px;
+    border: 0; background: transparent;
+    padding: 8px 10px; border-radius: 8px;
     text-align: left;
-    font-family: var(--lg-font-display);
-    font-weight: 700;
-    font-size: 13px;
+    font-family: var(--lg-font-display); font-weight: 700; font-size: 13px;
     color: var(--lg-on-background);
     cursor: pointer;
   }
   .ctx button:hover, .ctx button:focus-visible { background: var(--lg-surface-dim); outline: none; }
   .ctx button.is-danger { color: var(--lg-error); }
-  .ctx[hidden] { display: none; }
+  /* the menu sits outside #studio, so it needs its own [hidden] override for the display: flex items */
+  .ctx[hidden], .ctx [hidden] { display: none !important; }
   .ctx kbd { font: inherit; font-weight: 600; color: var(--lg-on-surface-subtle); }
   .toasts {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 22px;
-    z-index: 90;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-    pointer-events: none;
-    padding: 0 20px;
+    position: fixed; left: 0; right: 0; bottom: 22px; z-index: 90;
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    pointer-events: none; padding: 0 20px;
   }
   .toast {
     pointer-events: auto;
-    max-width: 420px;
-    width: min(100%, 420px);
-    padding: 16px 20px;
-    border-radius: 999px;
-    font-family: var(--lg-font-body);
-    font-size: 15px;
-    font-weight: 700;
-    line-height: 1.35;
+    width: fit-content; max-width: min(100%, 420px);
+    padding: 12px 20px; border-radius: 999px;
+    text-align: center;
+    font-family: var(--lg-font-body); font-size: 15px; font-weight: 700; line-height: 1.35;
     box-shadow: 0 16px 28px -18px rgba(74, 55, 40, .55);
     animation: toast-in .22s ease;
   }
@@ -450,48 +685,13 @@ import Logo from '../components/Logo.astro';
   @media (prefers-reduced-motion: reduce) {
     .toast, .toast.is-leaving { animation: none; }
   }
-  .check { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; }
-  .file { position: relative; }
-  .file--inline { flex: 1; }
-  .file--inline span { padding: 7px 10px; }
-  .file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
-  .file span {
-    display: flex; justify-content: center;
-    padding: 10px; border-radius: 14px;
-    border: 1px dashed var(--lg-outline);
-    background: var(--lg-background);
-    font-size: 13px; font-weight: 700;
-    color: var(--lg-on-primary-container);
-  }
-  .aspect-toggle {
-    display: inline-flex;
-    gap: 6px;
-    padding: 4px;
-    border-radius: 16px;
-    background: var(--lg-surface-dim);
-    width: max-content;
-  }
-  .aspect-toggle button {
-    border: 0;
-    background: transparent;
-    padding: 8px 14px;
-    border-radius: 12px;
-    font-family: var(--lg-font-display);
-    font-weight: 700;
-    font-size: 13.5px;
-    color: var(--lg-on-surface-variant);
-    cursor: pointer;
-  }
-  .aspect-toggle button.is-active {
-    background: var(--lg-surface);
-    color: var(--lg-on-background);
-  }
+
   .stage {
     flex: 1;
     min-height: 0;
     display: flex;
     overflow: auto;
-    padding: 16px 0 0;
+    padding: 24px;
     container-type: size;
   }
   .frame {
@@ -768,7 +968,6 @@ import Logo from '../components/Logo.astro';
   .mood-face--logo[data-logo-style="light"] { background: transparent; }
   .mood-face--logo[data-logo-style="dark"] { color: #4A3728; }
   .mood-face--logo[data-logo-style="light"] { color: #FBF6F0; }
-  .aspect-toggle--wrap { margin-top: 4px; }
   .mood-face__art--logo { padding: 14%; }
   .text-box {
     position: absolute;
@@ -823,102 +1022,46 @@ import Logo from '../components/Logo.astro';
   }
   .text-box.is-selected .text-box__width { display: block; }
   .text-box.is-selected .slot__rotate { display: block; }
-  .swatch-pick {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
-    font-weight: 700;
-    cursor: pointer;
+  /* Preview: paint the aspect as the app would — placeholder photos in the slots, no chrome, no handles, nothing grabbable. */
+  .frame.is-preview { pointer-events: none; cursor: default; }
+  .frame.is-preview .frame__empty,
+  .frame.is-preview .slot__label,
+  .frame.is-preview .slot__meta,
+  .frame.is-preview .slot__handle,
+  .frame.is-preview .slot__rotate,
+  .frame.is-preview .mood-face__meta,
+  .frame.is-preview .mood-face__size,
+  .frame.is-preview .text-box__meta,
+  .frame.is-preview .text-box__width,
+  .frame.is-preview .frame__grid,
+  .frame.is-preview .frame__safe,
+  .frame.is-preview .frame__guide { display: none !important; }
+  .frame.is-preview .slot__fill {
+    opacity: 1;
+    box-shadow: none;
+    background: var(--photo) center / cover no-repeat;
   }
-  .swatch-pick input[type="color"] {
-    width: 32px;
-    height: 32px;
-    padding: 0;
-    border: 1px solid var(--lg-outline-variant);
-    border-radius: 10px;
-    background: transparent;
-    cursor: pointer;
-  }
-  .studio__row--start { justify-content: flex-start; gap: 14px; }
-  .inspector__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .inspector select, .inspector input[type="color"] {
-    width: 100%;
-    min-height: 36px;
-    border: 1px solid var(--lg-outline-variant);
-    border-radius: 10px;
-    background: var(--lg-background);
-    font: inherit;
-    padding: 0 8px;
-  }
-  .layer-list { display: flex; flex-direction: column; gap: 6px; }
-  .layer-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-    border: 1px solid var(--lg-outline-variant);
-    background: var(--lg-background);
-    border-radius: 12px;
-    padding: 6px 6px 6px 10px;
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--lg-on-background);
-    cursor: pointer;
-  }
-  .layer-row.is-selected {
-    border-color: var(--lg-primary-hover);
-    background: var(--lg-primary-container);
-  }
-  .layer-row.is-missing { color: var(--lg-on-surface-subtle); }
-  .layer-row.is-pinned { border-style: dashed; }
-  .layer-row__pin {
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: .04em;
-    color: var(--lg-on-surface-subtle);
-    padding: 0 6px;
-  }
-  .layer-row__swatch {
-    width: 12px;
-    height: 12px;
-    border-radius: 3px;
-    background: var(--swatch, var(--lg-surface-dim));
-    box-shadow: inset 0 0 0 1px rgba(74, 55, 40, .25);
-    flex: none;
-  }
-  .layer-row__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .layer-row__tools { display: flex; gap: 2px; }
-  .layer-row__tools button {
-    border: 0;
-    background: transparent;
-    width: 24px;
-    height: 24px;
-    border-radius: 8px;
-    font-size: 11px;
-    color: var(--lg-on-surface-variant);
-    cursor: pointer;
-  }
-  .layer-row__tools button:hover:not(:disabled) { background: var(--lg-surface-dim); }
-  .layer-row__tools button:disabled { opacity: .3; cursor: default; }
-  .inspector {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    padding: 12px;
-    border-radius: 16px;
-    background: var(--lg-surface-container);
-  }
-  .inspector[hidden] { display: none; }
+  .frame.is-preview .frame__overlay { outline: none; }
+  .frame.is-preview .text-box { outline: none; }
+  .frame.is-preview .mood-face { box-shadow: none; }
+  .canvas.is-preview { background: var(--lg-surface-inverse, #211915); }
+
   /* .btn sets display: inline-flex, which beats the UA [hidden] rule */
   .studio [hidden] { display: none !important; }
-  input[type="range"] { width: 100%; accent-color: var(--lg-secondary); }
 
   @media (max-width: 900px) {
-    body:has(.studio) { overflow: auto; }
-    .studio { grid-template-columns: 1fr; height: auto; flex: none; }
-    .studio__side { border-right: 0; border-bottom: 1px solid var(--lg-outline-variant); max-height: none; }
-    .studio__stage { min-height: 72dvh; }
-    .studio-nav__note { display: none; }
+    html:has(.studio), body:has(.studio) { overflow: auto; height: auto; }
+    .studio {
+      height: auto;
+      grid-template-columns: 1fr;
+      grid-template-rows: auto auto auto auto;
+      grid-template-areas: 'top' 'left' 'canvas' 'right';
+    }
+    .topbar { grid-template-columns: 1fr; gap: 8px; padding: 8px 12px; height: auto; }
+    .topbar__right { justify-content: flex-start; flex-wrap: wrap; }
+    .panel { overflow: visible; }
+    .panel--left { border-right: 0; border-bottom: 1px solid var(--lg-outline-variant); }
+    .panel--right { border-left: 0; border-top: 1px solid var(--lg-outline-variant); }
+    .canvas { min-height: 72dvh; }
   }
 </style>
