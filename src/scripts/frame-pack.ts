@@ -70,13 +70,14 @@ export type Background = { kind: 'color'; color: string } | { kind: 'image'; fil
 export type Layer = { kind: 'overlay' } | { kind: 'photo'; photo: number } | { kind: 'mood' } | { kind: 'logo' }
 
 export type AspectLayout = {
-  overlay: string
+  /** Optional since the v4 studio: a pack can be background + photos alone. */
+  overlay?: string
   background?: Background
   slots: Slot[]
   texts: TextBind[]
   mood?: MoodPlacement
   logo?: LogoPlacement
-  /** Bottom to top. Contains the overlay once, every photo once, and the mood / logo iff present. */
+  /** Bottom to top. Contains every photo once, and the overlay / mood / logo iff present. */
   layers: Layer[]
 }
 
@@ -183,13 +184,13 @@ export function sanitizeText(text: TextBind): TextBind {
   }
 }
 
-type Stickers = { mood: boolean; logo: boolean }
+type Stickers = { overlay: boolean; mood: boolean; logo: boolean }
 const LAYER_KINDS = new Set<string>(['overlay', 'photo', 'mood', 'logo'])
 
 /** Default order: photos in index order, then the overlay, then the mood, then the logo. */
 export function defaultLayers(slots: Slot[], stickers: Stickers): Layer[] {
   const layers: Layer[] = slots.map((slot) => ({ kind: 'photo', photo: slot.photo }))
-  layers.push({ kind: 'overlay' })
+  if (stickers.overlay) layers.push({ kind: 'overlay' })
   if (stickers.mood) layers.push({ kind: 'mood' })
   if (stickers.logo) layers.push({ kind: 'logo' })
   return layers
@@ -204,6 +205,7 @@ export function sanitizeLayers(layers: Layer[], slots: Slot[], stickers: Sticker
     const key = layer.kind === 'photo' ? `photo:${layer.photo}` : layer.kind
     if (!LAYER_KINDS.has(layer.kind) || seen.has(key)) continue
     if (layer.kind === 'photo' && !photos.has(layer.photo)) continue
+    if (layer.kind === 'overlay' && !stickers.overlay) continue
     if (layer.kind === 'mood' && !stickers.mood) continue
     if (layer.kind === 'logo' && !stickers.logo) continue
     seen.add(key)
@@ -217,7 +219,7 @@ export function sanitizeLayers(layers: Layer[], slots: Slot[], stickers: Sticker
 }
 
 type AspectInput = {
-  overlay: string
+  overlay?: string
   background?: Background
   slots: Slot[]
   texts: TextBind[]
@@ -238,9 +240,9 @@ function downgradeAspect(layout: AspectLayout, schemaVersion: number): AspectLay
 }
 
 function buildAspect(input: AspectInput, aspect: Aspect, slots: Slot[], schemaVersion: number): AspectLayout {
-  const stickers = { mood: input.mood != null, logo: input.logo != null }
+  const stickers = { overlay: !!input.overlay, mood: input.mood != null, logo: input.logo != null }
   const layout: AspectLayout = {
-    overlay: input.overlay,
+    ...(input.overlay ? { overlay: input.overlay } : {}),
     ...(input.background ? { background: input.background } : {}),
     slots,
     texts: input.texts.map(sanitizeText),

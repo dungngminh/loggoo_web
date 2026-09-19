@@ -178,6 +178,20 @@ import Logo from '../components/Logo.astro';
               <span>photo index</span>
               <input data-slot-photo type="number" min="1" step="1" />
             </label>
+            <div class="studio__row">
+              <label class="field">
+                <span>width · dp</span>
+                <input data-slot-w type="number" min="1" step="1" />
+              </label>
+              <label class="field">
+                <span>height · dp</span>
+                <input data-slot-h type="number" min="1" step="1" />
+              </label>
+            </div>
+            <label class="check">
+              <input data-slot-lock type="checkbox" />
+              <span>lock aspect ratio</span>
+            </label>
             <button class="btn btn--ghost btn--sm" type="button" data-delete-slot>delete slot</button>
           </div>
         </div>
@@ -295,6 +309,7 @@ import Logo from '../components/Logo.astro';
   }
   .studio__block { display: flex; flex-direction: column; gap: 10px; }
   .studio__row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .studio__row > .field { flex: 1; min-width: 0; }
   .studio__label {
     margin: 0;
     font-size: 12px;
@@ -549,7 +564,24 @@ import Logo from '../components/Logo.astro';
     color: var(--lg-on-mood);
     pointer-events: none;
   }
-  .slot.is-selected .slot__meta { display: block; }
+  .slot.is-selected .slot__meta,
+  .frame__rubber::after {
+    display: block;
+    padding: 2px 5px;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--lg-on-mood) 78%, transparent);
+    color: var(--lg-surface);
+  }
+  .frame__rubber::after {
+    content: attr(data-size);
+    position: absolute;
+    right: 6px;
+    top: 6px;
+    font-family: var(--lg-font-display);
+    font-size: 10px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
   .slot__handle {
     position: absolute;
     width: 12px;

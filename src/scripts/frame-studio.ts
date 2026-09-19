@@ -1,5 +1,6 @@
 import {
   ALIGNS,
+  ASPECTS,
   FONTS,
   HEX_COLOR,
   IMAGE_ACCEPT,
@@ -202,6 +203,7 @@ export function mountStudio(root: HTMLElement): void {
   const rubber = $('[data-rubber]', root)
   const list = $('[data-layer-list]', root)
   const inspector = $('[data-inspector]', root)
+  const lockRatio = input('[data-slot-lock]', root)
   const textInspector = $('[data-text-inspector]', root)
   const snippet = $('[data-snippet]', root) as HTMLTextAreaElement
   const status = $('[data-status]', root)
@@ -466,6 +468,11 @@ export function mountStudio(root: HTMLElement): void {
     return Math.round(clamp(dp, 0, MAX_CORNER))
   }
 
+  /** Box size on the app's fixed design canvas (360dp wide), so authors read the same numbers the manifest implies. */
+  function sizeLabel(w: number, h: number): string {
+    return `${Math.round(w * FRAME_WIDTH_DP)}×${Math.round(h * ASPECT_HEIGHT_DP[aspect])}dp`
+  }
+
   function applySlotBox(el: HTMLElement, slot: DraftSlot): void {
     const isSelected = slot.id === selection
     el.classList.toggle('is-selected', isSelected)
@@ -480,7 +487,7 @@ export function mountStudio(root: HTMLElement): void {
     const label = el.querySelector('.slot__label')
     const meta = el.querySelector('.slot__meta')
     if (label) label.textContent = `photo ${slot.photo + 1}`
-    if (meta) meta.textContent = `${Math.round(slot.rotation)}° · r${Math.round(slot.cornerDp)}`
+    if (meta) meta.textContent = `${sizeLabel(slot.w, slot.h)} · ${Math.round(slot.rotation)}° · r${Math.round(slot.cornerDp)}`
   }
 
   function applyStickerBox(el: HTMLElement, which: Sticker, sticker: MoodPlacement): void {
@@ -702,7 +709,7 @@ export function mountStudio(root: HTMLElement): void {
       let name = ''
       let swatch = ''
       if (id === 'overlay') {
-        name = overlays[aspect] ? 'frame overlay' : 'frame overlay · none yet'
+        name = overlays[aspect] ? 'frame overlay' : 'frame overlay · optional'
       } else if (id === 'mood') {
         name = 'mood face'
         swatch = 'var(--lg-primary)'
@@ -712,7 +719,7 @@ export function mountStudio(root: HTMLElement): void {
       } else {
         const slot = layout().slots.find((item) => item.id === id)
         if (!slot) continue
-        name = `photo ${slot.photo + 1} · ${Math.round(slot.w * 100)}×${Math.round(slot.h * 100)}`
+        name = `photo ${slot.photo + 1} · ${sizeLabel(slot.w, slot.h)}`
         swatch = FILLS[slot.photo % FILLS.length]
       }
       const row = layerRow(
@@ -743,7 +750,11 @@ export function mountStudio(root: HTMLElement): void {
   function renderInspector(): void {
     const slot = selected()
     inspector.hidden = slot == null
-    if (slot) input('[data-slot-photo]', inspector).value = String(slot.photo + 1)
+    if (slot) {
+      input('[data-slot-photo]', inspector).value = String(slot.photo + 1)
+      input('[data-slot-w]', inspector).value = String(Math.round(slot.w * FRAME_WIDTH_DP))
+      input('[data-slot-h]', inspector).value = String(Math.round(slot.h * ASPECT_HEIGHT_DP[aspect]))
+    }
 
     const text = selectedText()
     textInspector.hidden = text == null
@@ -924,6 +935,28 @@ export function mountStudio(root: HTMLElement): void {
     if (handle.includes('e')) right = Math.max(x, left + 0.04)
     if (handle.includes('n')) top = Math.min(y, bottom - 0.04)
     if (handle.includes('s')) bottom = Math.max(y, top + 0.04)
+    if (lockRatio.checked) {
+      // Follow whichever axis the pointer stretched more, then keep the box inside the canvas from its anchored corner.
+      const ratio = origin.w / origin.h
+      let w = right - left
+      let h = bottom - top
+      if (w / origin.w >= h / origin.h) h = w / ratio
+      else w = h * ratio
+      const roomW = handle.includes('w') ? right : 1 - left
+      const roomH = handle.includes('n') ? bottom : 1 - top
+      if (w > roomW) {
+        w = roomW
+        h = w / ratio
+      }
+      if (h > roomH) {
+        h = roomH
+        w = h * ratio
+      }
+      if (handle.includes('w')) left = right - w
+      else right = left + w
+      if (handle.includes('n')) top = bottom - h
+      else bottom = top + h
+    }
     return {
       ...origin,
       x: clamp01(left),
@@ -1094,6 +1127,7 @@ export function mountStudio(root: HTMLElement): void {
       rubber.style.top = `${top * 100}%`
       rubber.style.width = `${Math.abs(x - currentPointer.startX) * 100}%`
       rubber.style.height = `${Math.abs(y - currentPointer.startY) * 100}%`
+      rubber.dataset.size = sizeLabel(Math.abs(x - currentPointer.startX), Math.abs(y - currentPointer.startY))
     }
   })
 
@@ -1348,11 +1382,30 @@ export function mountStudio(root: HTMLElement): void {
 
   inspector.addEventListener('input', (event) => {
     const slot = selected()
-    if (!slot || !(event.target instanceof HTMLInputElement)) return
-    if (event.target.matches('[data-slot-photo]')) {
-      slot.photo = Math.max(0, Math.floor(Number(event.target.value) - 1))
-    }
+    if (!slot || !(event.target instanceof HTMLInputElement) || event.target === lockRatio) return
+    if (!event.target.matches('[data-slot-photo]')) return
+    slot.photo = Math.max(0, Math.floor(Number(event.target.value) - 1))
     commit()
+    renderSlots()
+  })
+
+  // Sizes commit on `change` (blur / Enter), not `input`: re-rendering mid-typing would clamp "1" to the 14dp minimum under the cursor.
+  inspector.addEventListener('change', (event) => {
+    const slot = selected()
+    if (!slot || !(event.target instanceof HTMLInputElement) || !event.target.matches('[data-slot-w], [data-slot-h]')) return
+    const isW = event.target.matches('[data-slot-w]')
+    const dp = Number(event.target.value)
+    if (Number.isFinite(dp) && dp > 0) {
+      // Typed sizes resize from the top-left corner, clamped to the canvas; the lock keeps the other side in ratio.
+      const ratio = slot.w / slot.h
+      if (isW) slot.w = clamp(dp / FRAME_WIDTH_DP, 0.04, 1 - slot.x)
+      else slot.h = clamp(dp / ASPECT_HEIGHT_DP[aspect], 0.04, 1 - slot.y)
+      if (lockRatio.checked) {
+        if (isW) slot.h = clamp(slot.w / ratio, 0.04, 1 - slot.y)
+        else slot.w = clamp(slot.h * ratio, 0.04, 1 - slot.x)
+      }
+      commit()
+    }
     renderSlots()
   })
 
@@ -1532,14 +1585,20 @@ export function mountStudio(root: HTMLElement): void {
       toast('error', 'English name needs a letter or number so an id can be made')
       return
     }
-    if (!overlays.story || !overlays.post) {
-      toast('error', 'upload both a story overlay and a post overlay')
+    const emptyAspect = ASPECTS.find((which) => layouts[which].slots.length === 0)
+    if (emptyAspect) {
+      toast('error', `draw at least one photo slot on the ${emptyAspect} canvas`)
       return
     }
-    const storyExt = imageExt(overlays.story)
-    const postExt = imageExt(overlays.post)
+    // ponytail: overlays are optional from v4 on; v2 / v3 readers still require both files.
+    if (schemaVersion() < SCHEMA_VERSION && (!overlays.story || !overlays.post)) {
+      toast('error', `schema v${schemaVersion()} needs both a story overlay and a post overlay`)
+      return
+    }
+    const storyExt = overlays.story ? imageExt(overlays.story) : null
+    const postExt = overlays.post ? imageExt(overlays.post) : null
     const iconExt = iconFile ? imageExt(iconFile) : 'png'
-    if (!storyExt || !postExt || !iconExt) {
+    if ((overlays.story && !storyExt) || (overlays.post && !postExt) || !iconExt) {
       toast('error', 'overlays and icon must be png, jpg, or jpeg')
       return
     }
@@ -1565,8 +1624,8 @@ export function mountStudio(root: HTMLElement): void {
     }
 
     try {
-      const storyOverlay = `story.${storyExt}`
-      const postOverlay = `post.${postExt}`
+      const storyOverlay = storyExt ? `story.${storyExt}` : undefined
+      const postOverlay = postExt ? `post.${postExt}` : undefined
       const iconName = `icon.${iconExt}`
       const storyBg = background('story')
       const postBg = background('post')
@@ -1598,10 +1657,10 @@ export function mountStudio(root: HTMLElement): void {
       const encoder = new TextEncoder()
       const files = [
         { path: `frames/${id}/manifest.json`, data: encoder.encode(`${JSON.stringify(manifest, null, 2)}\n`) },
-        { path: `frames/${id}/${storyOverlay}`, data: await fileBytes(overlays.story) },
-        { path: `frames/${id}/${postOverlay}`, data: await fileBytes(overlays.post) },
         { path: `frames/${id}/${iconName}`, data: iconFile ? await fileBytes(iconFile) : await fallbackIcon() },
       ]
+      if (storyOverlay && overlays.story) files.push({ path: `frames/${id}/${storyOverlay}`, data: await fileBytes(overlays.story) })
+      if (postOverlay && overlays.post) files.push({ path: `frames/${id}/${postOverlay}`, data: await fileBytes(overlays.post) })
       for (const bg of [storyBg, postBg]) {
         if (bg.file) files.push({ path: `frames/${id}/${bg.file.path}`, data: await fileBytes(bg.file.data) })
       }
@@ -1638,6 +1697,6 @@ export function mountStudio(root: HTMLElement): void {
   renderOverlay()
   renderSlots()
   resetHistory()
-  setStatus('upload a story overlay, then switch to draw slot to punch a photo hole')
+  setStatus('switch to draw slot to punch a photo hole — an overlay is optional')
   void restoreDraft()
 }
