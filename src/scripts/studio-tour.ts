@@ -133,7 +133,8 @@ export function mountTour(root: HTMLElement, tourRoot: HTMLElement): void {
     next.textContent = step === STEPS.length - 1 ? 'done' : step === 0 ? 'show me' : 'next'
     tourRoot.hidden = false
     place()
-    next.focus()
+    // no programmatic focus: the document keydown handles Enter / arrows, and a focused button can show a stray caret
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
   }
 
   function stop(): void {

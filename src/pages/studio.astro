@@ -712,7 +712,7 @@ import Logo from '../components/Logo.astro';
   .tour__body { margin: 0; font-size: 13px; line-height: 1.45; color: var(--lg-on-surface-variant); }
   .tour__actions { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
   .tour__spacer { flex: 1; }
-  .tour__actions .btn--xs { align-self: auto; }
+  .tour__actions .btn--xs { align-self: auto; user-select: none; -webkit-user-select: none; caret-color: transparent; }
   @media (prefers-reduced-motion: reduce) { .tour__spot { transition: none; } }
   .toasts {
     position: fixed; left: 0; right: 0; bottom: 22px; z-index: 90;
