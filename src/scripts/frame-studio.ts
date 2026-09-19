@@ -1,7 +1,17 @@
 import {
+  ALIGNS,
+  FONTS,
+  HEX_COLOR,
   IMAGE_ACCEPT,
+  LOGO_STYLES,
+  MAX_TEXT_LINES,
+  type Align,
   type Aspect,
+  type Background,
+  type Font,
   type Layer,
+  type LogoPlacement,
+  type LogoStyle,
   type MoodPlacement,
   type Slot,
   type TextBind,
@@ -18,12 +28,19 @@ type Handle = 'nw' | 'ne' | 'sw' | 'se'
 
 type DraftSlot = Slot & { id: string }
 type DraftText = TextBind & { id: string }
-/** `layers` is the paint order, bottom to top: 'overlay', 'mood', or a slot id. */
-type Layout = { slots: DraftSlot[]; texts: DraftText[]; mood?: MoodPlacement; layers: string[] }
+/** The two square stickers share one placement shape and one canvas code path. */
+type Sticker = 'mood' | 'logo'
+/** `layers` is the paint order, bottom to top: 'overlay', 'mood', 'logo', or a slot id. Texts always paint above. */
+type Layout = { slots: DraftSlot[]; texts: DraftText[]; mood?: MoodPlacement; logo?: LogoPlacement; layers: string[] }
+type DraftBackground = { kind: 'color'; color: string } | { kind: 'image'; file: File }
 type Mode = 'select' | 'draw'
 
 /** What undo/redo and the saved draft carry. Files are immutable, so snapshots share them by reference. */
-type Snapshot = { layouts: string; overlays: Record<Aspect, File | null> }
+type Snapshot = {
+  layouts: string
+  overlays: Record<Aspect, File | null>
+  backgrounds: Record<Aspect, DraftBackground | null>
+}
 type Draft = {
   nameEn: string
   nameVi: string
@@ -31,6 +48,7 @@ type Draft = {
   aspect: Aspect
   layouts: Record<Aspect, Layout>
   overlays: Record<Aspect, File | null>
+  backgrounds?: Record<Aspect, DraftBackground | null>
   icon: File | null
   savedAt: number
 }
@@ -40,18 +58,23 @@ type PointerMode =
   | { kind: 'resize'; id: string; handle: Handle; startX: number; startY: number; origin: Slot }
   | { kind: 'rotate'; id: string; origin: number; startAngle: number }
   | { kind: 'radius'; id: string }
-  | { kind: 'mood-move'; startX: number; startY: number; originX: number; originY: number }
-  | { kind: 'mood-resize' }
-  | { kind: 'mood-rotate'; origin: number; startAngle: number }
+  | { kind: 'sticker-move'; which: Sticker; startX: number; startY: number; originX: number; originY: number }
+  | { kind: 'sticker-resize'; which: Sticker }
+  | { kind: 'sticker-rotate'; which: Sticker; origin: number; startAngle: number }
+  | { kind: 'text-move'; id: string; startX: number; startY: number; originX: number; originY: number }
+  | { kind: 'text-resize'; id: string }
+  | { kind: 'text-rotate'; id: string; origin: number; startAngle: number }
   | { kind: 'draw'; startX: number; startY: number }
 
 const RESIZE = new Set<string>(['nw', 'ne', 'sw', 'se'])
+const STICKERS: Sticker[] = ['mood', 'logo']
 const MAX_TILT = 45
 const MAX_CORNER = 24
 const FRAME_WIDTH_DP = 360
 const ASPECT_HEIGHT_DP: Record<Aspect, number> = { story: 640, post: 450 }
-const MIN_MOOD_SIZE_DP = 16
-const MAX_MOOD_SIZE_DP = 180
+const MIN_STICKER_SIZE_DP = 16
+const MAX_STICKER_SIZE_DP = 180
+const MIN_TEXT_W = 0.05
 const HISTORY_LIMIT = 100
 /** Rail tile is 40dp; 256px covers 3x screens with room for the ring. Below 128px it visibly blurs. */
 const ICON_MIN_PX = 128
@@ -59,6 +82,16 @@ const ICON_RECOMMENDED_PX = 256
 const ZOOM_STEP = 1.25
 const ZOOM_MIN = 0.5
 const ZOOM_MAX = 4
+/** Stand-in for the day's note so the author can judge wrapping and the line cap. */
+const NOTE_SAMPLE =
+  'Slow morning, long walk by the river, and a good book before bed. Felt like the day finally caught its breath.'
+const FONT_FAMILY: Record<Font, string> = {
+  poppins: "'Poppins', sans-serif",
+  caveat: "'Caveat', cursive",
+  sacramento: "'Sacramento', cursive",
+  baloo: "'Baloo 2', sans-serif",
+  playfair: "'Playfair Display', serif",
+}
 
 const FILLS = ['#F6B393', '#9BD9B8', '#A9D6EE', '#F6E3A3', '#F3C3CB', '#E8804F']
 function uid(): string {
@@ -74,6 +107,12 @@ function $(sel: string, root: ParentNode = document): HTMLElement {
 function input(sel: string, root: ParentNode = document): HTMLInputElement {
   const node = root.querySelector(sel)
   if (!(node instanceof HTMLInputElement)) throw new Error(`missing ${sel}`)
+  return node
+}
+
+function selectEl(sel: string, root: ParentNode = document): HTMLSelectElement {
+  const node = root.querySelector(sel)
+  if (!(node instanceof HTMLSelectElement)) throw new Error(`missing ${sel}`)
   return node
 }
 
@@ -121,30 +160,61 @@ function defaultMood(): MoodPlacement {
   return { x: 0.72, y: 0.08, sizeDp: 48, rotation: 0 }
 }
 
+function defaultLogo(): LogoPlacement {
+  return { x: 0.06, y: 0.88, sizeDp: 32, rotation: 0, style: 'tile' }
+}
+
+function defaultText(): DraftText {
+  return {
+    id: uid(),
+    bind: 'note',
+    x: 0.1,
+    y: 0.7,
+    w: 0.8,
+    rotation: 0,
+    font: 'caveat',
+    sizeSp: 18,
+    color: '#4A3728',
+    maxLines: 3,
+    align: 'start',
+  }
+}
+
+function emptyLayout(): Layout {
+  return { slots: [], texts: [], layers: ['overlay'] }
+}
+
+function sameBackground(a: DraftBackground | null, b: DraftBackground | null): boolean {
+  if (a == null || b == null) return a === b
+  if (a.kind !== b.kind) return false
+  return a.kind === 'color' ? a.color === (b as { color: string }).color : a.file === (b as { file: File }).file
+}
+
 export function mountStudio(root: HTMLElement): void {
   const frame = $('[data-frame]', root)
   const overlayImg = $('[data-overlay]', root) as HTMLImageElement
+  const backgroundImg = $('[data-background]', root) as HTMLImageElement
   const slotLayer = $('[data-slots]', root)
-  const moodLayer = $('[data-mood-layer]', root)
+  const stickerLayer = $('[data-stickers]', root)
+  const textLayer = $('[data-texts]', root)
   const rubber = $('[data-rubber]', root)
   const list = $('[data-layer-list]', root)
   const inspector = $('[data-inspector]', root)
+  const textInspector = $('[data-text-inspector]', root)
   const snippet = $('[data-snippet]', root) as HTMLTextAreaElement
   const status = $('[data-status]', root)
   const toasts = $('[data-toasts]')
   const idLabel = $('[data-id]', root)
-  const addMoodButton = $('[data-add-mood]', root) as HTMLButtonElement
-  const deleteMoodButton = $('[data-delete-mood]', root) as HTMLButtonElement
-  const moodStatus = $('[data-mood-status]', root)
   const removeOverlayButton = $('[data-remove-overlay]', root) as HTMLButtonElement
+  const removeBackgroundButton = $('[data-remove-background]', root) as HTMLButtonElement
+  const backgroundStatus = $('[data-background-status]', root)
+  const addTextButton = $('[data-add-text]', root) as HTMLButtonElement
 
   const overlays: Record<Aspect, File | null> = { story: null, post: null }
+  const backgrounds: Record<Aspect, DraftBackground | null> = { story: null, post: null }
   // Object URLs live as long as the page: history and the draft keep old Files reachable anyway.
   const objectUrls = new Map<File, string>()
-  const layouts: Record<Aspect, Layout> = {
-    story: { slots: [], texts: [], layers: ['overlay'] },
-    post: { slots: [], texts: [], layers: ['overlay'] },
-  }
+  const layouts: Record<Aspect, Layout> = { story: emptyLayout(), post: emptyLayout() }
   const history: Snapshot[] = []
   let historyIndex = -1
   let zoom = 1
@@ -152,9 +222,8 @@ export function mountStudio(root: HTMLElement): void {
 
   let aspect: Aspect = 'story'
   let mode: Mode = 'select'
-  let selectedId: string | null = null
-  let moodSelected = false
-  let frameSelected = false
+  /** A slot id, a text id, 'mood', 'logo', 'overlay', 'background', or nothing. */
+  let selection: string | null = null
   let pointer: PointerMode | null = null
   let iconFile: File | null = null
 
@@ -162,9 +231,7 @@ export function mountStudio(root: HTMLElement): void {
     return layouts[aspect]
   }
 
-  function overlayUrlFor(which: Aspect): string | null {
-    const file = overlays[which]
-    if (!file) return null
+  function urlFor(file: File): string {
     let url = objectUrls.get(file)
     if (!url) {
       url = URL.createObjectURL(file)
@@ -174,11 +241,17 @@ export function mountStudio(root: HTMLElement): void {
   }
 
   function snapshot(): Snapshot {
-    return { layouts: JSON.stringify(layouts), overlays: { ...overlays } }
+    return { layouts: JSON.stringify(layouts), overlays: { ...overlays }, backgrounds: { ...backgrounds } }
   }
 
   function sameSnapshot(a: Snapshot, b: Snapshot): boolean {
-    return a.layouts === b.layouts && a.overlays.story === b.overlays.story && a.overlays.post === b.overlays.post
+    return (
+      a.layouts === b.layouts &&
+      a.overlays.story === b.overlays.story &&
+      a.overlays.post === b.overlays.post &&
+      sameBackground(a.backgrounds.story, b.backgrounds.story) &&
+      sameBackground(a.backgrounds.post, b.backgrounds.post)
+    )
   }
 
   /** Record the current state as an undo step. No-op when nothing changed since the last step. */
@@ -203,7 +276,9 @@ export function mountStudio(root: HTMLElement): void {
     layouts.post = parsed.post
     overlays.story = step.overlays.story
     overlays.post = step.overlays.post
-    clearSelection()
+    backgrounds.story = step.backgrounds.story
+    backgrounds.post = step.backgrounds.post
+    selection = null
     renderOverlay()
     renderSlots()
   }
@@ -238,6 +313,7 @@ export function mountStudio(root: HTMLElement): void {
         aspect,
         layouts: JSON.parse(JSON.stringify(layouts)) as Record<Aspect, Layout>,
         overlays: { ...overlays },
+        backgrounds: { ...backgrounds },
         icon: iconFile,
         savedAt: Date.now(),
       }
@@ -245,22 +321,9 @@ export function mountStudio(root: HTMLElement): void {
     }, 400)
   }
 
-  /** Inline z-index: 10 + stack position; the selected layer lifts above everything so its handles stay reachable. */
+  /** Inline z-index: 10 + stack position; texts sit at 90; the selected layer lifts above everything so its handles stay reachable. */
   function layerZ(id: string, isSelected: boolean): string {
     return isSelected ? '100' : String(10 + layout().layers.indexOf(id))
-  }
-
-  function selectedLayer(): string | null {
-    if (selectedId) return selectedId
-    if (moodSelected) return 'mood'
-    if (frameSelected) return 'overlay'
-    return null
-  }
-
-  function clearSelection(): void {
-    selectedId = null
-    moodSelected = false
-    frameSelected = false
   }
 
   function moveLayer(id: string, delta: 1 | -1): void {
@@ -275,20 +338,24 @@ export function mountStudio(root: HTMLElement): void {
   }
 
   function selected(): DraftSlot | undefined {
-    return layout().slots.find((slot) => slot.id === selectedId)
+    return layout().slots.find((slot) => slot.id === selection)
   }
 
-  function moodSizeFractions(mood: MoodPlacement): { width: number; height: number } {
+  function selectedText(): DraftText | undefined {
+    return layout().texts.find((text) => text.id === selection)
+  }
+
+  function stickerSizeFractions(sticker: MoodPlacement): { width: number; height: number } {
     return {
-      width: mood.sizeDp / FRAME_WIDTH_DP,
-      height: mood.sizeDp / ASPECT_HEIGHT_DP[aspect],
+      width: sticker.sizeDp / FRAME_WIDTH_DP,
+      height: sticker.sizeDp / ASPECT_HEIGHT_DP[aspect],
     }
   }
 
-  function clampMoodPosition(mood: MoodPlacement): void {
-    const size = moodSizeFractions(mood)
-    mood.x = clamp01(Math.min(mood.x, 1 - size.width))
-    mood.y = clamp01(Math.min(mood.y, 1 - size.height))
+  function clampStickerPosition(sticker: MoodPlacement): void {
+    const size = stickerSizeFractions(sticker)
+    sticker.x = clamp01(Math.min(sticker.x, 1 - size.width))
+    sticker.y = clamp01(Math.min(sticker.y, 1 - size.height))
   }
 
   function setStatus(message: string): void {
@@ -344,17 +411,27 @@ export function mountStudio(root: HTMLElement): void {
     return (Math.atan2(event.clientY - center.y, event.clientX - center.x) * 180) / Math.PI
   }
 
-  function moodCenterPx(mood: MoodPlacement): { x: number; y: number } {
+  function stickerCenterPx(sticker: MoodPlacement): { x: number; y: number } {
     const box = frame.getBoundingClientRect()
-    const size = moodSizeFractions(mood)
+    const size = stickerSizeFractions(sticker)
     return {
-      x: box.left + (mood.x + size.width / 2) * box.width,
-      y: box.top + (mood.y + size.height / 2) * box.height,
+      x: box.left + (sticker.x + size.width / 2) * box.width,
+      y: box.top + (sticker.y + size.height / 2) * box.height,
     }
   }
 
-  function moodPointerAngle(event: PointerEvent, mood: MoodPlacement): number {
-    const center = moodCenterPx(mood)
+  /** Angle from the text box's centre; its height comes from the DOM since it follows the line cap. */
+  function textPointerAngle(event: PointerEvent, text: DraftText): number {
+    const el = textLayer.querySelector(`[data-text-id="${text.id}"]`)
+    if (!(el instanceof HTMLElement)) return 0
+    const box = el.getBoundingClientRect()
+    const cx = box.left + box.width / 2
+    const cy = box.top + box.height / 2
+    return (Math.atan2(event.clientY - cy, event.clientX - cx) * 180) / Math.PI
+  }
+
+  function stickerPointerAngle(event: PointerEvent, sticker: MoodPlacement): number {
+    const center = stickerCenterPx(sticker)
     return (Math.atan2(event.clientY - center.y, event.clientX - center.x) * 180) / Math.PI
   }
 
@@ -376,13 +453,14 @@ export function mountStudio(root: HTMLElement): void {
   }
 
   function applySlotBox(el: HTMLElement, slot: DraftSlot): void {
-    el.classList.toggle('is-selected', slot.id === selectedId)
+    const isSelected = slot.id === selection
+    el.classList.toggle('is-selected', isSelected)
     el.style.left = `${slot.x * 100}%`
     el.style.top = `${slot.y * 100}%`
     el.style.width = `${slot.w * 100}%`
     el.style.height = `${slot.h * 100}%`
     el.style.transform = `rotate(${slot.rotation}deg)`
-    el.style.zIndex = layerZ(slot.id, slot.id === selectedId)
+    el.style.zIndex = layerZ(slot.id, isSelected)
     el.style.setProperty('--fill', FILLS[slot.photo % FILLS.length])
     el.style.setProperty('--corner', `${slot.cornerDp}`)
     const label = el.querySelector('.slot__label')
@@ -391,31 +469,54 @@ export function mountStudio(root: HTMLElement): void {
     if (meta) meta.textContent = `${Math.round(slot.rotation)}° · r${Math.round(slot.cornerDp)}`
   }
 
-  function applyMoodBox(el: HTMLElement, mood: MoodPlacement): void {
-    el.classList.toggle('is-selected', moodSelected)
-    el.style.left = `${mood.x * 100}%`
-    el.style.top = `${mood.y * 100}%`
-    el.style.width = `${(mood.sizeDp / FRAME_WIDTH_DP) * 100}%`
-    el.style.transform = `rotate(${mood.rotation}deg)`
-    el.style.zIndex = layerZ('mood', moodSelected)
+  function applyStickerBox(el: HTMLElement, which: Sticker, sticker: MoodPlacement): void {
+    const isSelected = selection === which
+    el.classList.toggle('is-selected', isSelected)
+    el.style.left = `${sticker.x * 100}%`
+    el.style.top = `${sticker.y * 100}%`
+    el.style.width = `${(sticker.sizeDp / FRAME_WIDTH_DP) * 100}%`
+    el.style.transform = `rotate(${sticker.rotation}deg)`
+    el.style.zIndex = layerZ(which, isSelected)
+    if (which === 'logo') el.dataset.logoStyle = (sticker as LogoPlacement).style
     const meta = el.querySelector('.mood-face__meta')
-    if (meta) meta.textContent = `${Math.round(mood.rotation)}° · ${Math.round(mood.sizeDp)}dp`
+    if (meta) meta.textContent = `${Math.round(sticker.rotation)}° · ${Math.round(sticker.sizeDp)}dp`
+  }
+
+  function applyTextBox(el: HTMLElement, text: DraftText): void {
+    const isSelected = text.id === selection
+    el.classList.toggle('is-selected', isSelected)
+    el.style.left = `${text.x * 100}%`
+    el.style.top = `${text.y * 100}%`
+    el.style.width = `${text.w * 100}%`
+    el.style.transform = `rotate(${text.rotation}deg)`
+    el.style.zIndex = isSelected ? '100' : '90'
+    el.style.fontFamily = FONT_FAMILY[text.font]
+    el.style.color = text.color
+    el.style.textAlign = text.align
+    el.style.setProperty('--sp', String(text.sizeSp))
+    el.style.setProperty('--lines', String(text.maxLines))
+    const meta = el.querySelector('.text-box__meta')
+    if (meta)
+      meta.textContent = `${text.font} · ${text.sizeSp}sp · ${text.maxLines} line${text.maxLines === 1 ? '' : 's'} · ${Math.round(text.rotation)}°`
   }
 
   function paintDragging(): void {
     const currentPointer = pointer
     if (!currentPointer || currentPointer.kind === 'draw') return
-    if (
-      currentPointer.kind === 'mood-move' ||
-      currentPointer.kind === 'mood-resize' ||
-      currentPointer.kind === 'mood-rotate'
-    ) {
-      const mood = layout().mood
-      const el = moodLayer.querySelector('[data-mood]')
-      if (mood && el instanceof HTMLElement) applyMoodBox(el, mood)
+    if (currentPointer.kind.startsWith('sticker-')) {
+      const which = (currentPointer as { which: Sticker }).which
+      const sticker = layout()[which]
+      const el = stickerLayer.querySelector(`[data-sticker="${which}"]`)
+      if (sticker && el instanceof HTMLElement) applyStickerBox(el, which, sticker)
       return
     }
-    const slot = layout().slots.find((item) => item.id === currentPointer.id)
+    if (currentPointer.kind.startsWith('text-')) {
+      const text = layout().texts.find((item) => item.id === (currentPointer as { id: string }).id)
+      const el = text && textLayer.querySelector(`[data-text-id="${text.id}"]`)
+      if (text && el instanceof HTMLElement) applyTextBox(el, text)
+      return
+    }
+    const slot = layout().slots.find((item) => item.id === (currentPointer as { id: string }).id)
     if (!slot) return
     const el = slotLayer.querySelector(`[data-slot-id="${slot.id}"]`)
     if (el instanceof HTMLElement) applySlotBox(el, slot)
@@ -424,46 +525,96 @@ export function mountStudio(root: HTMLElement): void {
   function paintSelection(): void {
     for (const node of slotLayer.children) {
       if (node instanceof HTMLElement && node.dataset.slotId) {
-        const isSelected = node.dataset.slotId === selectedId
+        const isSelected = node.dataset.slotId === selection
         node.classList.toggle('is-selected', isSelected)
         node.style.zIndex = layerZ(node.dataset.slotId, isSelected)
       }
     }
-    const mood = moodLayer.querySelector('[data-mood]')
-    if (mood instanceof HTMLElement) {
-      mood.classList.toggle('is-selected', moodSelected)
-      mood.style.zIndex = layerZ('mood', moodSelected)
+    for (const node of stickerLayer.children) {
+      if (node instanceof HTMLElement && node.dataset.sticker) {
+        const isSelected = node.dataset.sticker === selection
+        node.classList.toggle('is-selected', isSelected)
+        node.style.zIndex = layerZ(node.dataset.sticker, isSelected)
+      }
     }
-    frame.classList.toggle('is-frame-selected', frameSelected)
-    overlayImg.style.zIndex = layerZ('overlay', frameSelected)
+    for (const node of textLayer.children) {
+      if (node instanceof HTMLElement && node.dataset.textId) {
+        const isSelected = node.dataset.textId === selection
+        node.classList.toggle('is-selected', isSelected)
+        node.style.zIndex = isSelected ? '100' : '90'
+      }
+    }
+    frame.classList.toggle('is-frame-selected', selection === 'overlay')
+    overlayImg.style.zIndex = layerZ('overlay', selection === 'overlay')
     for (const row of list.querySelectorAll<HTMLElement>('[data-layer]')) {
-      row.classList.toggle('is-selected', row.dataset.layer === selectedLayer())
+      row.classList.toggle('is-selected', row.dataset.layer === selection)
     }
   }
 
-  function renderMood(): void {
-    moodLayer.replaceChildren()
-    const mood = layout().mood
-    addMoodButton.hidden = mood != null
-    deleteMoodButton.hidden = mood == null
-    moodStatus.textContent = mood == null ? 'not used in this aspect' : `${Math.round(mood.sizeDp)}dp mood face`
-    if (!mood) return
+  function renderStickers(): void {
+    stickerLayer.replaceChildren()
+    for (const which of STICKERS) {
+      const sticker = layout()[which]
+      const addButton = $(`[data-add-sticker="${which}"]`, root) as HTMLButtonElement
+      const deleteButton = $(`[data-delete-sticker="${which}"]`, root) as HTMLButtonElement
+      addButton.hidden = sticker != null
+      deleteButton.hidden = sticker == null
+      $(`[data-sticker-status="${which}"]`, root).textContent =
+        sticker == null ? 'not used in this aspect' : `${Math.round(sticker.sizeDp)}dp ${which === 'mood' ? 'mood face' : 'loggoo mark'}`
+      if (which === 'logo') {
+        const logo = layout().logo
+        root.querySelectorAll<HTMLElement>('[data-logo-style]').forEach((node) => {
+          node.hidden = logo == null
+          node.classList.toggle('is-active', node.dataset.logoStyle === logo?.style)
+        })
+      }
+      if (!sticker) continue
 
-    const el = document.createElement('div')
-    el.className = 'mood-face'
-    el.dataset.mood = ''
-    el.setAttribute('role', 'button')
-    el.setAttribute('aria-label', 'mood face placement')
-    el.innerHTML = `
-      <svg class="mood-face__art" viewBox="0 0 48 48" aria-hidden="true">
-        <path d="M13 20c1.6-2.6 4.6-2.6 6.2 0M28.8 20c1.6-2.6 4.6-2.6 6.2 0M15 27c3.2 5.4 14.8 5.4 18 0" />
-      </svg>
-      <span class="mood-face__meta"></span>
-      <span class="mood-face__size" data-mood-handle="resize" aria-label="resize mood face"></span>
-      <span class="slot__rotate" data-mood-handle="rotate" aria-label="rotate mood face"></span>
-    `
-    applyMoodBox(el, mood)
-    moodLayer.append(el)
+      const el = document.createElement('div')
+      el.className = `mood-face mood-face--${which}`
+      el.dataset.sticker = which
+      el.setAttribute('role', 'button')
+      el.setAttribute('aria-label', which === 'mood' ? 'mood face placement' : 'loggoo icon placement')
+      const art =
+        which === 'mood'
+          ? `<svg class="mood-face__art" viewBox="0 0 48 48" aria-hidden="true">
+              <path d="M13 20c1.6-2.6 4.6-2.6 6.2 0M28.8 20c1.6-2.6 4.6-2.6 6.2 0M15 27c3.2 5.4 14.8 5.4 18 0" />
+            </svg>`
+          : `<svg class="mood-face__art mood-face__art--logo" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+              <circle cx="18.5" cy="26" r="10" stroke="currentColor" stroke-width="5" />
+              <circle cx="29.5" cy="26" r="10" stroke="currentColor" stroke-width="5" />
+              <circle cx="36.5" cy="11.5" r="5" fill="#F6B393" />
+            </svg>`
+      el.innerHTML = `
+        ${art}
+        <span class="mood-face__meta"></span>
+        <span class="mood-face__size" data-sticker-handle="resize" aria-label="resize"></span>
+        <span class="slot__rotate" data-sticker-handle="rotate" aria-label="rotate"></span>
+      `
+      applyStickerBox(el, which, sticker)
+      stickerLayer.append(el)
+    }
+  }
+
+  function renderTexts(): void {
+    textLayer.replaceChildren()
+    addTextButton.hidden = layout().texts.length > 0
+    for (const text of layout().texts) {
+      const el = document.createElement('div')
+      el.className = 'text-box'
+      el.dataset.textId = text.id
+      el.setAttribute('role', 'button')
+      el.setAttribute('aria-label', 'note text placement')
+      el.innerHTML = `
+        <span class="text-box__body"></span>
+        <span class="text-box__meta"></span>
+        <span class="text-box__width" data-text-handle="w" aria-label="change text width"></span>
+        <span class="slot__rotate" data-text-handle="rotate" aria-label="rotate text"></span>
+      `
+      $('.text-box__body', el).textContent = NOTE_SAMPLE
+      applyTextBox(el, text)
+      textLayer.append(el)
+    }
   }
 
   function renderSlots(): void {
@@ -492,60 +643,125 @@ export function mountStudio(root: HTMLElement): void {
 
     renderLayers()
     renderInspector()
-    renderMood()
+    renderStickers()
+    renderTexts()
     scheduleSave()
+  }
+
+  function backgroundLabel(): string {
+    const background = backgrounds[aspect]
+    if (!background) return 'background · none'
+    return background.kind === 'color' ? `background · ${background.color}` : `background · ${background.file.name}`
+  }
+
+  function layerRow(id: string, name: string, swatch: string, tools: string): HTMLElement {
+    const row = document.createElement('div')
+    row.className = 'layer-row'
+    row.dataset.layer = id
+    row.setAttribute('role', 'button')
+    row.tabIndex = 0
+    row.classList.toggle('is-selected', id === selection)
+    row.innerHTML = `
+      <span class="layer-row__swatch"></span>
+      <span class="layer-row__name"></span>
+      <span class="layer-row__tools">${tools}</span>
+    `
+    $('.layer-row__name', row).textContent = name
+    if (swatch) row.style.setProperty('--swatch', swatch)
+    return row
   }
 
   function renderLayers(): void {
     list.replaceChildren()
     const layers = layout().layers
     const top = layers.length - 1
+    // Texts always paint above the stack: pinned rows on top, no reorder tools.
+    for (const text of layout().texts) {
+      const row = layerRow(text.id, `note text · ${text.font} ${text.sizeSp}sp`, text.color, '<span class="layer-row__pin">top</span>')
+      row.classList.add('is-pinned')
+      list.append(row)
+    }
     // Photoshop order: top of the stack is the first row.
     for (let i = top; i >= 0; i--) {
       const id = layers[i]
-      const row = document.createElement('div')
-      row.className = 'layer-row'
-      row.dataset.layer = id
-      row.setAttribute('role', 'button')
-      row.tabIndex = 0
       let name = ''
       let swatch = ''
       if (id === 'overlay') {
         name = overlays[aspect] ? 'frame overlay' : 'frame overlay · none yet'
-        row.classList.toggle('is-missing', overlays[aspect] == null)
       } else if (id === 'mood') {
         name = 'mood face'
         swatch = 'var(--lg-primary)'
+      } else if (id === 'logo') {
+        name = 'loggoo icon'
+        swatch = '#211915'
       } else {
         const slot = layout().slots.find((item) => item.id === id)
         if (!slot) continue
         name = `photo ${slot.photo + 1} · ${Math.round(slot.w * 100)}×${Math.round(slot.h * 100)}`
         swatch = FILLS[slot.photo % FILLS.length]
       }
-      row.classList.toggle('is-selected', id === selectedLayer())
-      row.innerHTML = `
-        <span class="layer-row__swatch"></span>
-        <span class="layer-row__name"></span>
-        <span class="layer-row__tools">
-          <button type="button" data-layer-up aria-label="bring forward" ${i === top ? 'disabled' : ''}>▲</button>
-          <button type="button" data-layer-down aria-label="send backward" ${i === 0 ? 'disabled' : ''}>▼</button>
-        </span>
-      `
-      $('.layer-row__name', row).textContent = name
-      if (swatch) row.style.setProperty('--swatch', swatch)
+      const row = layerRow(
+        id,
+        name,
+        swatch,
+        `<button type="button" data-layer-up aria-label="bring forward" ${i === top ? 'disabled' : ''}>▲</button>
+         <button type="button" data-layer-down aria-label="send backward" ${i === 0 ? 'disabled' : ''}>▼</button>`,
+      )
+      row.classList.toggle('is-missing', id === 'overlay' && overlays[aspect] == null)
       list.append(row)
     }
+    // The background always paints first: pinned row at the bottom.
+    const background = backgrounds[aspect]
+    const row = layerRow(
+      'background',
+      backgroundLabel(),
+      background?.kind === 'color' ? background.color : '',
+      '<span class="layer-row__pin">bottom</span>',
+    )
+    row.classList.add('is-pinned')
+    row.classList.toggle('is-missing', background == null)
+    list.append(row)
   }
 
   function renderInspector(): void {
     const slot = selected()
     inspector.hidden = slot == null
-    if (!slot) return
-    input('[data-slot-photo]', inspector).value = String(slot.photo + 1)
+    if (slot) input('[data-slot-photo]', inspector).value = String(slot.photo + 1)
+
+    const text = selectedText()
+    textInspector.hidden = text == null
+    if (!text) return
+    selectEl('[data-text-font]', textInspector).value = text.font
+    input('[data-text-size]', textInspector).value = String(text.sizeSp)
+    input('[data-text-color]', textInspector).value = text.color
+    input('[data-text-lines]', textInspector).value = String(text.maxLines)
+    selectEl('[data-text-align]', textInspector).value = text.align
+  }
+
+  function renderBackground(): void {
+    const background = backgrounds[aspect]
+    frame.style.background = background?.kind === 'color' ? background.color : ''
+    if (background?.kind === 'image') {
+      backgroundImg.hidden = false
+      backgroundImg.src = urlFor(background.file)
+    } else {
+      backgroundImg.hidden = true
+      backgroundImg.removeAttribute('src')
+    }
+    input('[data-background-color]', root).value = background?.kind === 'color' ? background.color : '#FBF6F0'
+    input('[data-background-file]', root).value = ''
+    removeBackgroundButton.hidden = background == null
+    backgroundStatus.textContent =
+      background == null
+        ? 'none · the app paints its own surface'
+        : background.kind === 'color'
+          ? `solid ${background.color}`
+          : `${background.file.name} · full-bleed`
   }
 
   function renderOverlay(): void {
-    const url = overlayUrlFor(aspect)
+    const file = overlays[aspect]
+    const url = file ? urlFor(file) : null
     frame.dataset.aspect = aspect
     frame.classList.toggle('has-overlay', url != null)
     if (url) {
@@ -556,49 +772,66 @@ export function mountStudio(root: HTMLElement): void {
       overlayImg.removeAttribute('src')
     }
     $('[data-aspect-label]', root).textContent = aspect === 'story' ? '9:16 story' : '4:5 post'
-    $('[data-overlay-empty]', root).textContent =
-      url != null ? '' : `upload a ${aspect} overlay`
+    $('[data-overlay-empty]', root).textContent = url != null ? '' : `upload a ${aspect} overlay`
     input('[data-overlay-file]', root).value = ''
     removeOverlayButton.hidden = url == null
-    if (url == null) frameSelected = false
-    overlayImg.style.zIndex = layerZ('overlay', frameSelected)
-    frame.classList.toggle('is-frame-selected', frameSelected)
+    if (url == null && selection === 'overlay') selection = null
+    overlayImg.style.zIndex = layerZ('overlay', selection === 'overlay')
+    frame.classList.toggle('is-frame-selected', selection === 'overlay')
+    renderBackground()
     scheduleSave()
   }
 
-  function select(id: string | null): void {
-    clearSelection()
-    selectedId = id
+  function selectLayer(id: string | null): void {
+    selection = id
     renderSlots()
   }
 
-  function selectLayer(id: string): void {
-    clearSelection()
-    if (id === 'overlay') frameSelected = true
-    else if (id === 'mood') moodSelected = true
-    else selectedId = id
-    renderSlots()
-  }
-
-  function addMood(): void {
-    if (layout().mood) return
-    layout().mood = defaultMood()
-    layout().layers.push('mood')
-    clearSelection()
-    moodSelected = true
+  function addSticker(which: Sticker): void {
+    if (layout()[which]) return
+    if (which === 'mood') layout().mood = defaultMood()
+    else layout().logo = defaultLogo()
+    layout().layers.push(which)
+    selection = which
     commit()
     renderSlots()
-    setStatus(`${aspect} mood face added — move, resize, or rotate it on the canvas`)
+    setStatus(`${aspect} ${which === 'mood' ? 'mood face' : 'loggoo icon'} added — move, resize, or rotate it on the canvas`)
   }
 
-  function removeMood(): void {
-    if (!layout().mood) return
-    delete layout().mood
-    layout().layers = layout().layers.filter((id) => id !== 'mood')
-    moodSelected = false
+  function removeSticker(which: Sticker): void {
+    if (!layout()[which]) return
+    delete layout()[which]
+    layout().layers = layout().layers.filter((id) => id !== which)
+    if (selection === which) selection = null
     commit()
     renderSlots()
-    setStatus(`${aspect} will not render a mood face`)
+    setStatus(`${aspect} will not render a ${which === 'mood' ? 'mood face' : 'loggoo icon'}`)
+  }
+
+  function addText(): void {
+    if (layout().texts.length > 0) return
+    const text = defaultText()
+    layout().texts.push(text)
+    selection = text.id
+    commit()
+    renderSlots()
+    setStatus(`${aspect} note text added — drag it, pull the right edge to set its width, top knob rotates`)
+  }
+
+  function removeText(id: string): void {
+    layout().texts = layout().texts.filter((text) => text.id !== id)
+    if (selection === id) selection = null
+    commit()
+    renderSlots()
+    setStatus(`${aspect} will not render the note`)
+  }
+
+  function setBackground(next: DraftBackground | null): void {
+    backgrounds[aspect] = next
+    commit()
+    renderBackground()
+    renderLayers()
+    scheduleSave()
   }
 
   /** New photos go straight under the frame, like the app's default paint order. */
@@ -607,20 +840,19 @@ export function mountStudio(root: HTMLElement): void {
     slots.push(slot)
     const overlayIndex = layers.indexOf('overlay')
     layers.splice(overlayIndex < 0 ? layers.length : overlayIndex, 0, slot.id)
-    clearSelection()
-    selectedId = slot.id
+    selection = slot.id
   }
 
   /**
-   * First visit to an empty aspect copies the other aspect's slots, mood, and layer order so the author
-   * only nudges positions instead of redrawing. Heights are rescaled so each box keeps its dp size.
+   * First visit to an empty aspect copies the other aspect's slots, stickers, text, background, and layer order so
+   * the author only nudges positions instead of redrawing. Heights are rescaled so each box keeps its dp size.
    */
   function seedFromOtherAspect(): void {
     const target = layout()
-    if (target.slots.length > 0 || target.mood) return
+    if (target.slots.length > 0 || target.mood || target.logo || target.texts.length > 0 || backgrounds[aspect]) return
     const other: Aspect = aspect === 'story' ? 'post' : 'story'
     const source = layouts[other]
-    if (source.slots.length === 0 && !source.mood) return
+    if (source.slots.length === 0 && !source.mood && !source.logo && source.texts.length === 0 && !backgrounds[other]) return
     const scaleY = ASPECT_HEIGHT_DP[other] / ASPECT_HEIGHT_DP[aspect]
     const idMap = new Map<string, string>()
     target.slots = source.slots.map((slot) => {
@@ -629,15 +861,19 @@ export function mountStudio(root: HTMLElement): void {
       const h = clamp01(Math.min(1, slot.h * scaleY))
       return { ...slot, id, h, y: clamp01(Math.min(slot.y * scaleY, 1 - h)) }
     })
-    if (source.mood) {
-      const mood = { ...source.mood }
-      mood.y = mood.y * scaleY
-      clampMoodPosition(mood)
-      target.mood = mood
+    for (const which of STICKERS) {
+      const sticker = source[which]
+      if (!sticker) continue
+      const copy = { ...sticker, y: sticker.y * scaleY }
+      clampStickerPosition(copy)
+      if (which === 'mood') target.mood = copy
+      else target.logo = copy as LogoPlacement
     }
+    target.texts = source.texts.map((text) => ({ ...text, id: uid(), y: clamp01(text.y * scaleY) }))
     target.layers = source.layers.map((id) => idMap.get(id) ?? id)
+    backgrounds[aspect] = backgrounds[other]
     commit()
-    setStatus(`copied ${target.slots.length} slots from ${other} — nudge them for ${aspect}`)
+    setStatus(`copied ${other}'s layout — nudge it for ${aspect}`)
   }
 
   function addSlot(): void {
@@ -650,14 +886,14 @@ export function mountStudio(root: HTMLElement): void {
 
   function removeSelected(): void {
     const slots = layout().slots
-    const index = slots.findIndex((slot) => slot.id === selectedId)
+    const index = slots.findIndex((slot) => slot.id === selection)
     if (index < 0) return
     const [removed] = slots.splice(index, 1)
     layout().layers = layout().layers.filter((id) => id !== removed.id)
     slots.forEach((slot, i) => {
       slot.photo = i
     })
-    selectedId = slots[index]?.id ?? slots[index - 1]?.id ?? null
+    selection = slots[index]?.id ?? slots[index - 1]?.id ?? null
     commit()
     renderSlots()
   }
@@ -686,38 +922,44 @@ export function mountStudio(root: HTMLElement): void {
     if (!(target instanceof HTMLElement)) return
     const { x, y } = localFrac(event)
     const handle = target.dataset.handle
-    const moodHandle = target.dataset.moodHandle
-    const moodEl = target.closest('[data-mood]')
+    const stickerHandle = target.dataset.stickerHandle
+    const stickerEl = target.closest('[data-sticker]')
+    const textEl = target.closest('[data-text-id]')
     const slotEl = target.closest('[data-slot-id]')
-    if (moodEl instanceof HTMLElement) {
-      const mood = layout().mood
-      if (!mood) return
-      clearSelection()
-      moodSelected = true
-      if (moodHandle === 'rotate') {
+    if (stickerEl instanceof HTMLElement) {
+      const which = stickerEl.dataset.sticker as Sticker
+      const sticker = layout()[which]
+      if (!sticker) return
+      selection = which
+      if (stickerHandle === 'rotate') {
         pointer = {
-          kind: 'mood-rotate',
-          origin: mood.rotation,
-          startAngle: moodPointerAngle(event, mood),
+          kind: 'sticker-rotate',
+          which,
+          origin: sticker.rotation,
+          startAngle: stickerPointerAngle(event, sticker),
         }
-      } else if (moodHandle === 'resize') {
-        pointer = { kind: 'mood-resize' }
+      } else if (stickerHandle === 'resize') {
+        pointer = { kind: 'sticker-resize', which }
       } else {
-        pointer = {
-          kind: 'mood-move',
-          startX: x,
-          startY: y,
-          originX: mood.x,
-          originY: mood.y,
-        }
+        pointer = { kind: 'sticker-move', which, startX: x, startY: y, originX: sticker.x, originY: sticker.y }
       }
+      paintSelection()
+    } else if (textEl instanceof HTMLElement) {
+      const id = textEl.dataset.textId
+      const text = layout().texts.find((item) => item.id === id)
+      if (!text || !id) return
+      selection = id
+      const textHandle = target.dataset.textHandle
+      if (textHandle === 'w') pointer = { kind: 'text-resize', id }
+      else if (textHandle === 'rotate') {
+        pointer = { kind: 'text-rotate', id, origin: text.rotation, startAngle: textPointerAngle(event, text) }
+      } else pointer = { kind: 'text-move', id, startX: x, startY: y, originX: text.x, originY: text.y }
       paintSelection()
     } else if (handle && slotEl instanceof HTMLElement) {
       const id = slotEl.dataset.slotId
       const slot = layout().slots.find((item) => item.id === id)
       if (!slot || !id) return
-      clearSelection()
-      selectedId = id
+      selection = id
       if (handle === 'rotate') {
         pointer = { kind: 'rotate', id, origin: slot.rotation, startAngle: pointerAngle(event, slot) }
       } else if (handle === 'radius') {
@@ -736,19 +978,17 @@ export function mountStudio(root: HTMLElement): void {
       const id = slotEl.dataset.slotId
       const slot = layout().slots.find((item) => item.id === id)
       if (!slot || !id) return
-      clearSelection()
-      selectedId = id
+      selection = id
       pointer = { kind: 'move', id, startX: x, startY: y, originX: slot.x, originY: slot.y }
       paintSelection()
     } else if (mode === 'draw') {
-      clearSelection()
+      selection = null
       pointer = { kind: 'draw', startX: x, startY: y }
       rubber.hidden = false
       paintSelection()
     } else {
       // select mode: empty canvas click picks the frame (when there is one) or clears the selection
-      clearSelection()
-      frameSelected = overlays[aspect] != null
+      selection = overlays[aspect] != null ? 'overlay' : null
       paintSelection()
       return
     }
@@ -785,31 +1025,49 @@ export function mountStudio(root: HTMLElement): void {
       if (!slot) return
       slot.cornerDp = applyCorner(event, slot)
       paintDragging()
-    } else if (currentPointer.kind === 'mood-move') {
-      const mood = layout().mood
-      if (!mood) return
-      mood.x = currentPointer.originX + (x - currentPointer.startX)
-      mood.y = currentPointer.originY + (y - currentPointer.startY)
-      clampMoodPosition(mood)
+    } else if (currentPointer.kind === 'sticker-move') {
+      const sticker = layout()[currentPointer.which]
+      if (!sticker) return
+      sticker.x = currentPointer.originX + (x - currentPointer.startX)
+      sticker.y = currentPointer.originY + (y - currentPointer.startY)
+      clampStickerPosition(sticker)
       paintDragging()
-    } else if (currentPointer.kind === 'mood-resize') {
-      const mood = layout().mood
-      if (!mood) return
-      const sizeFromX = (x - mood.x) * FRAME_WIDTH_DP
-      const sizeFromY = (y - mood.y) * ASPECT_HEIGHT_DP[aspect]
+    } else if (currentPointer.kind === 'sticker-resize') {
+      const sticker = layout()[currentPointer.which]
+      if (!sticker) return
+      const sizeFromX = (x - sticker.x) * FRAME_WIDTH_DP
+      const sizeFromY = (y - sticker.y) * ASPECT_HEIGHT_DP[aspect]
       const maximum = Math.min(
-        MAX_MOOD_SIZE_DP,
-        (1 - mood.x) * FRAME_WIDTH_DP,
-        (1 - mood.y) * ASPECT_HEIGHT_DP[aspect],
+        MAX_STICKER_SIZE_DP,
+        (1 - sticker.x) * FRAME_WIDTH_DP,
+        (1 - sticker.y) * ASPECT_HEIGHT_DP[aspect],
       )
-      mood.sizeDp = Math.round(clamp(Math.max(sizeFromX, sizeFromY), MIN_MOOD_SIZE_DP, maximum))
-      clampMoodPosition(mood)
+      sticker.sizeDp = Math.round(clamp(Math.max(sizeFromX, sizeFromY), MIN_STICKER_SIZE_DP, maximum))
+      clampStickerPosition(sticker)
       paintDragging()
-    } else if (currentPointer.kind === 'mood-rotate') {
-      const mood = layout().mood
-      if (!mood) return
-      mood.rotation = applyTilt(
-        currentPointer.origin + wrapDelta(moodPointerAngle(event, mood) - currentPointer.startAngle),
+    } else if (currentPointer.kind === 'sticker-rotate') {
+      const sticker = layout()[currentPointer.which]
+      if (!sticker) return
+      sticker.rotation = applyTilt(
+        currentPointer.origin + wrapDelta(stickerPointerAngle(event, sticker) - currentPointer.startAngle),
+      )
+      paintDragging()
+    } else if (currentPointer.kind === 'text-move') {
+      const text = layout().texts.find((item) => item.id === currentPointer.id)
+      if (!text) return
+      text.x = clamp01(Math.min(currentPointer.originX + (x - currentPointer.startX), 1 - text.w))
+      text.y = clamp01(currentPointer.originY + (y - currentPointer.startY))
+      paintDragging()
+    } else if (currentPointer.kind === 'text-resize') {
+      const text = layout().texts.find((item) => item.id === currentPointer.id)
+      if (!text) return
+      text.w = clamp(x - text.x, MIN_TEXT_W, 1 - text.x)
+      paintDragging()
+    } else if (currentPointer.kind === 'text-rotate') {
+      const text = layout().texts.find((item) => item.id === currentPointer.id)
+      if (!text) return
+      text.rotation = applyTilt(
+        currentPointer.origin + wrapDelta(textPointerAngle(event, text) - currentPointer.startAngle),
       )
       paintDragging()
     } else {
@@ -858,8 +1116,7 @@ export function mountStudio(root: HTMLElement): void {
   // Clicking the stage around the canvas clears the selection; the sidebar keeps it so its buttons still apply.
   $('.stage', root).addEventListener('pointerdown', (event) => {
     if (event.button !== 0 || frame.contains(event.target as Node)) return
-    clearSelection()
-    renderSlots()
+    selectLayer(null)
   })
 
   // ⌘/Ctrl + wheel (and trackpad pinch, which arrives as a ctrlKey wheel) zooms about the cursor; a plain wheel scrolls.
@@ -911,7 +1168,7 @@ export function mountStudio(root: HTMLElement): void {
     hint.firstChild!.textContent =
       next === 'draw'
         ? 'draw: drag on the canvas to punch a photo hole · switches back to select after one · '
-        : 'select: click the frame, a slot, or the mood · move / resize · top knob rotates · inner dot rounds photo corners · '
+        : 'select: click the frame, a slot, a sticker, or the note · move / resize · top knob rotates · inner dot rounds photo corners · '
   }
 
   root.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach((button) => {
@@ -923,8 +1180,26 @@ export function mountStudio(root: HTMLElement): void {
 
   $('[data-add-slot]', root).addEventListener('click', addSlot)
   $('[data-delete-slot]', root).addEventListener('click', removeSelected)
-  addMoodButton.addEventListener('click', addMood)
-  deleteMoodButton.addEventListener('click', removeMood)
+  for (const which of STICKERS) {
+    $(`[data-add-sticker="${which}"]`, root).addEventListener('click', () => addSticker(which))
+    $(`[data-delete-sticker="${which}"]`, root).addEventListener('click', () => removeSticker(which))
+  }
+  root.querySelectorAll<HTMLButtonElement>('[data-logo-style]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const logo = layout().logo
+      const style = button.dataset.logoStyle
+      if (!logo || !(LOGO_STYLES as readonly string[]).includes(style ?? '')) return
+      logo.style = style as LogoStyle
+      selection = 'logo'
+      commit()
+      renderSlots()
+    })
+  })
+  addTextButton.addEventListener('click', addText)
+  $('[data-delete-text]', root).addEventListener('click', () => {
+    const text = selectedText()
+    if (text) removeText(text.id)
+  })
 
   root.querySelectorAll<HTMLButtonElement>('[data-aspect]').forEach((button) => {
     button.addEventListener('click', () => {
@@ -934,7 +1209,7 @@ export function mountStudio(root: HTMLElement): void {
       root.querySelectorAll('[data-aspect]').forEach((node) => {
         node.classList.toggle('is-active', node === button)
       })
-      clearSelection()
+      selection = null
       seedFromOtherAspect()
       renderOverlay()
       renderSlots()
@@ -942,6 +1217,7 @@ export function mountStudio(root: HTMLElement): void {
   })
 
   input('[data-overlay-file]', root).accept = IMAGE_ACCEPT
+  input('[data-background-file]', root).accept = IMAGE_ACCEPT
   input('[data-icon-file]', root).accept = IMAGE_ACCEPT
 
   input('[data-overlay-file]', root).addEventListener('change', (event) => {
@@ -954,8 +1230,7 @@ export function mountStudio(root: HTMLElement): void {
       return
     }
     overlays[aspect] = file
-    clearSelection()
-    frameSelected = true
+    selection = 'overlay'
     commit()
     renderOverlay()
     renderSlots()
@@ -972,6 +1247,40 @@ export function mountStudio(root: HTMLElement): void {
   }
 
   removeOverlayButton.addEventListener('click', removeOverlay)
+
+  input('[data-background-file]', root).addEventListener('change', (event) => {
+    const picker = event.target as HTMLInputElement
+    const file = picker.files?.[0]
+    if (!file) return
+    if (!imageExt(file)) {
+      picker.value = ''
+      toast('error', 'background must be png, jpg, or jpeg')
+      return
+    }
+    setBackground({ kind: 'image', file })
+    setStatus(`${aspect} background image set — it paints under everything`)
+  })
+
+  // `input` fires on every drag of the colour wheel; only `change` commits, so undo gets one step per pick.
+  input('[data-background-color]', root).addEventListener('input', (event) => {
+    const color = (event.target as HTMLInputElement).value.toUpperCase()
+    backgrounds[aspect] = { kind: 'color', color }
+    frame.style.background = color
+    backgroundImg.hidden = true
+  })
+  input('[data-background-color]', root).addEventListener('change', (event) => {
+    setBackground({ kind: 'color', color: (event.target as HTMLInputElement).value.toUpperCase() })
+    setStatus(`${aspect} background colour set`)
+  })
+
+  function removeBackground(): void {
+    if (!backgrounds[aspect]) return
+    setBackground(null)
+    if (selection === 'background') selectLayer(null)
+    setStatus(`${aspect} background removed`)
+  }
+
+  removeBackgroundButton.addEventListener('click', removeBackground)
 
   function imageSize(file: File): Promise<{ width: number; height: number }> {
     return new Promise((resolve, reject) => {
@@ -1030,9 +1339,45 @@ export function mountStudio(root: HTMLElement): void {
     renderSlots()
   })
 
+  textInspector.addEventListener('input', (event) => {
+    const text = selectedText()
+    const field = event.target
+    if (!text || !(field instanceof HTMLInputElement || field instanceof HTMLSelectElement)) return
+    if (field.matches('[data-text-font]') && (FONTS as readonly string[]).includes(field.value)) {
+      text.font = field.value as Font
+    } else if (field.matches('[data-text-size]')) {
+      text.sizeSp = clamp(Math.round(Number(field.value)) || 4, 4, 200)
+    } else if (field.matches('[data-text-color]') && HEX_COLOR.test(field.value)) {
+      text.color = field.value.toUpperCase()
+    } else if (field.matches('[data-text-lines]')) {
+      text.maxLines = clamp(Math.floor(Number(field.value)) || 1, 1, MAX_TEXT_LINES)
+    } else if (field.matches('[data-text-align]') && (ALIGNS as readonly string[]).includes(field.value)) {
+      text.align = field.value as Align
+    } else {
+      return
+    }
+    // Colour drags fire `input` continuously; the change event below commits once.
+    if (field.matches('[data-text-color]')) {
+      const el = textLayer.querySelector(`[data-text-id="${text.id}"]`)
+      if (el instanceof HTMLElement) applyTextBox(el, text)
+      return
+    }
+    commit()
+    renderTexts()
+    renderLayers()
+    scheduleSave()
+  })
+  textInspector.addEventListener('change', (event) => {
+    if (!(event.target instanceof HTMLInputElement) || !event.target.matches('[data-text-color]')) return
+    commit()
+    renderLayers()
+    scheduleSave()
+  })
+
   document.addEventListener('keydown', (event) => {
     const active = document.activeElement
-    const typing = active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement
+    const typing =
+      active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement || active instanceof HTMLSelectElement
     const meta = event.metaKey || event.ctrlKey
     if (meta && !event.altKey) {
       // Zoom: ⌘/Ctrl + / - / 0. Taken over from the browser so the page chrome stays put.
@@ -1073,17 +1418,14 @@ export function mountStudio(root: HTMLElement): void {
     }
     if (event.key !== 'Backspace' && event.key !== 'Delete') return
     if (typing) return
-    if (!root.contains(active) && selectedLayer() == null) return
-    if (selectedId) {
-      event.preventDefault()
-      removeSelected()
-    } else if (moodSelected) {
-      event.preventDefault()
-      removeMood()
-    } else if (frameSelected) {
-      event.preventDefault()
-      removeOverlay()
-    }
+    if (!root.contains(active) && selection == null) return
+    if (selection == null) return
+    event.preventDefault()
+    if (selection === 'overlay') removeOverlay()
+    else if (selection === 'background') removeBackground()
+    else if (selection === 'mood' || selection === 'logo') removeSticker(selection)
+    else if (selectedText()) removeText(selection)
+    else removeSelected()
   })
 
   $('[data-export]', root).addEventListener('click', () => {
@@ -1102,13 +1444,15 @@ export function mountStudio(root: HTMLElement): void {
   syncId()
 
   $('[data-reset]', root).addEventListener('click', () => {
-    if (!window.confirm('Start over? This clears the saved draft, both overlays, slots, and names.')) return
+    if (!window.confirm('Start over? This clears the saved draft, both overlays, backgrounds, slots, and names.')) return
     window.clearTimeout(saveTimer)
     void clearDraft()
     overlays.story = null
     overlays.post = null
-    layouts.story = { slots: [], texts: [], layers: ['overlay'] }
-    layouts.post = { slots: [], texts: [], layers: ['overlay'] }
+    backgrounds.story = null
+    backgrounds.post = null
+    layouts.story = emptyLayout()
+    layouts.post = emptyLayout()
     iconFile = null
     input('[name="nameEn"]', root).value = ''
     input('[name="nameVi"]', root).value = ''
@@ -1116,7 +1460,7 @@ export function mountStudio(root: HTMLElement): void {
     input('[data-icon-file]', root).value = ''
     snippet.value = ''
     syncId()
-    clearSelection()
+    selection = null
     resetHistory()
     renderOverlay()
     renderSlots()
@@ -1133,13 +1477,15 @@ export function mountStudio(root: HTMLElement): void {
     layouts.post = draft.layouts.post
     overlays.story = draft.overlays.story
     overlays.post = draft.overlays.post
+    backgrounds.story = draft.backgrounds?.story ?? null
+    backgrounds.post = draft.backgrounds?.post ?? null
     iconFile = draft.icon
     syncId()
     aspect = draft.aspect
     root.querySelectorAll<HTMLElement>('[data-aspect]').forEach((node) => {
       node.classList.toggle('is-active', node.dataset.aspect === aspect)
     })
-    clearSelection()
+    selection = null
     resetHistory()
     renderOverlay()
     renderSlots()
@@ -1180,40 +1526,48 @@ export function mountStudio(root: HTMLElement): void {
       layouts[which].layers.flatMap((id): Layer[] => {
         if (id === 'overlay') return [{ kind: 'overlay' }]
         if (id === 'mood') return [{ kind: 'mood' }]
+        if (id === 'logo') return [{ kind: 'logo' }]
         const slot = layouts[which].slots.find((item) => item.id === id)
         return slot ? [{ kind: 'photo', photo: slot.photo }] : []
       })
 
-    const texts = (which: Aspect): TextBind[] =>
-      layouts[which].texts.map(({ bind, x, y, font, sizeSp, color }) => ({
-        bind,
-        x,
-        y,
-        font,
-        sizeSp,
-        color,
-      }))
+    const texts = (which: Aspect): TextBind[] => layouts[which].texts.map(({ id: _id, ...text }) => text)
+
+    /** Background image files are `story_bg.<ext>` / `post_bg.<ext>`; colours need no file. */
+    const background = (which: Aspect): { manifest?: Background; file?: { path: string; data: File } } => {
+      const value = backgrounds[which]
+      if (!value) return {}
+      if (value.kind === 'color') return { manifest: value }
+      const name = `${which}_bg.${imageExt(value.file) ?? 'png'}`
+      return { manifest: { kind: 'image', file: name }, file: { path: name, data: value.file } }
+    }
 
     try {
       const storyOverlay = `story.${storyExt}`
       const postOverlay = `post.${postExt}`
       const iconName = `icon.${iconExt}`
+      const storyBg = background('story')
+      const postBg = background('post')
       const manifest = buildManifest({
         id,
         names: { en, vi },
         premium: input('[name="premium"]', root).checked,
         story: {
           overlay: storyOverlay,
+          background: storyBg.manifest,
           slots: layouts.story.slots,
           texts: texts('story'),
           mood: layouts.story.mood,
+          logo: layouts.story.logo,
           layers: layers('story'),
         },
         post: {
           overlay: postOverlay,
+          background: postBg.manifest,
           slots: layouts.post.slots,
           texts: texts('post'),
           mood: layouts.post.mood,
+          logo: layouts.post.logo,
           layers: layers('post'),
         },
       })
@@ -1225,6 +1579,9 @@ export function mountStudio(root: HTMLElement): void {
         { path: `frames/${id}/${postOverlay}`, data: await fileBytes(overlays.post) },
         { path: `frames/${id}/${iconName}`, data: iconFile ? await fileBytes(iconFile) : await fallbackIcon() },
       ]
+      for (const bg of [storyBg, postBg]) {
+        if (bg.file) files.push({ path: `frames/${id}/${bg.file.path}`, data: await fileBytes(bg.file.data) })
+      }
       const blob = zipStore(files)
       const link = document.createElement('a')
       link.href = URL.createObjectURL(blob)

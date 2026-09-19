@@ -1,15 +1,27 @@
-/** Pack schema v3 — the file committed to loggoo_asset. Canvas fractions, not pixels. v3 adds `layers`, the bottom-to-top paint order per aspect. */
+/**
+ * Pack schema v4 — the file committed to loggoo_asset. Canvas fractions, not pixels.
+ * v3 added `layers`, the bottom-to-top paint order per aspect.
+ * v4 adds an optional `background` (colour or full-bleed image, always painted first), an optional `logo`
+ * placement (the Loggoo mark in one of three styles, a `layers` entry like the mood), and text `w` / `maxLines` / `align`.
+ */
 
-export const SCHEMA_VERSION = 3
+export const SCHEMA_VERSION = 4
 export const SLUG = /^[a-z0-9_]{1,40}$/
 export const BINDS = ['title', 'date', 'note', 'mood'] as const
 export const FONTS = ['poppins', 'caveat', 'sacramento', 'baloo', 'playfair'] as const
+export const ALIGNS = ['start', 'center', 'end'] as const
+/** tile = mark on the dark brand tile; dark / light = bare mark (no tile) for light / dark artwork. */
+export const LOGO_STYLES = ['tile', 'dark', 'light'] as const
+export const HEX_COLOR = /^#[0-9a-fA-F]{6}$/
+export const MAX_TEXT_LINES = 20
 export const ASPECTS = ['story', 'post'] as const
 export const IMAGE_ACCEPT = 'image/png,image/jpeg,.png,.jpg,.jpeg'
 
 export type Bind = (typeof BINDS)[number]
 export type Font = (typeof FONTS)[number]
 export type Aspect = (typeof ASPECTS)[number]
+export type Align = (typeof ALIGNS)[number]
+export type LogoStyle = (typeof LOGO_STYLES)[number]
 
 export type Slot = {
   photo: number
@@ -21,15 +33,21 @@ export type Slot = {
   cornerDp: number
 }
 
+/** A text box: `w` is its width as a canvas fraction; text wraps inside it and is cut with an ellipsis after `maxLines`. Rotates about its centre. */
 export type TextBind = {
   bind: Bind
   x: number
   y: number
+  w: number
+  rotation: number
   font: Font
   sizeSp: number
   color: string
+  maxLines: number
+  align: Align
 }
 
+/** Shared by the mood face and the Loggoo logo tile: a square sticker sized in dp. */
 export type MoodPlacement = {
   x: number
   y: number
@@ -37,15 +55,22 @@ export type MoodPlacement = {
   rotation: number
 }
 
-/** One entry in the paint order. Text binds always paint above every layer. */
-export type Layer = { kind: 'overlay' } | { kind: 'photo'; photo: number } | { kind: 'mood' }
+export type LogoPlacement = MoodPlacement & { style: LogoStyle }
+
+/** Painted first, under everything. Image files are full-bleed like the overlay. */
+export type Background = { kind: 'color'; color: string } | { kind: 'image'; file: string }
+
+/** One entry in the paint order. The background always paints below and text binds above every layer. */
+export type Layer = { kind: 'overlay' } | { kind: 'photo'; photo: number } | { kind: 'mood' } | { kind: 'logo' }
 
 export type AspectLayout = {
   overlay: string
+  background?: Background
   slots: Slot[]
   texts: TextBind[]
   mood?: MoodPlacement
-  /** Bottom to top. Contains the overlay once, every photo once, and the mood iff present. */
+  logo?: LogoPlacement
+  /** Bottom to top. Contains the overlay once, every photo once, and the mood / logo iff present. */
   layers: Layer[]
 }
 
@@ -136,35 +161,77 @@ export function sanitizeMood(mood: MoodPlacement, aspect: Aspect): MoodPlacement
   }
 }
 
-/** Default order: photos in index order, then the overlay, then the mood. */
-export function defaultLayers(slots: Slot[], hasMood: boolean): Layer[] {
+export function sanitizeText(text: TextBind): TextBind {
+  const w = round4(Math.max(0.05, clamp01(text.w)))
+  return {
+    bind: text.bind,
+    x: round4(clamp01(Math.min(text.x, 1 - w))),
+    y: round4(clamp01(text.y)),
+    w,
+    rotation: round4(Math.min(45, Math.max(-45, text.rotation))),
+    font: text.font,
+    sizeSp: round4(Math.min(200, Math.max(4, text.sizeSp))),
+    color: HEX_COLOR.test(text.color) ? text.color.toUpperCase() : '#4A3728',
+    maxLines: Math.min(MAX_TEXT_LINES, Math.max(1, Math.floor(text.maxLines))),
+    align: text.align,
+  }
+}
+
+type Stickers = { mood: boolean; logo: boolean }
+const LAYER_KINDS = new Set<string>(['overlay', 'photo', 'mood', 'logo'])
+
+/** Default order: photos in index order, then the overlay, then the mood, then the logo. */
+export function defaultLayers(slots: Slot[], stickers: Stickers): Layer[] {
   const layers: Layer[] = slots.map((slot) => ({ kind: 'photo', photo: slot.photo }))
   layers.push({ kind: 'overlay' })
-  if (hasMood) layers.push({ kind: 'mood' })
+  if (stickers.mood) layers.push({ kind: 'mood' })
+  if (stickers.logo) layers.push({ kind: 'logo' })
   return layers
 }
 
 /** Keeps the author's order but guarantees every layer appears exactly once; missing ones fall to the bottom. */
-export function sanitizeLayers(layers: Layer[], slots: Slot[], hasMood: boolean): Layer[] {
+export function sanitizeLayers(layers: Layer[], slots: Slot[], stickers: Stickers): Layer[] {
   const photos = new Set(slots.map((slot) => slot.photo))
   const seen = new Set<string>()
   const out: Layer[] = []
   for (const layer of layers) {
     const key = layer.kind === 'photo' ? `photo:${layer.photo}` : layer.kind
-    if (seen.has(key)) continue
+    if (!LAYER_KINDS.has(layer.kind) || seen.has(key)) continue
     if (layer.kind === 'photo' && !photos.has(layer.photo)) continue
-    if (layer.kind === 'mood' && !hasMood) continue
+    if (layer.kind === 'mood' && !stickers.mood) continue
+    if (layer.kind === 'logo' && !stickers.logo) continue
     seen.add(key)
     out.push(layer)
   }
-  const missing = defaultLayers(slots, hasMood).filter((layer) => {
+  const missing = defaultLayers(slots, stickers).filter((layer) => {
     const key = layer.kind === 'photo' ? `photo:${layer.photo}` : layer.kind
     return !seen.has(key)
   })
   return [...missing, ...out]
 }
 
-type AspectInput = { overlay: string; slots: Slot[]; texts: TextBind[]; mood?: MoodPlacement; layers?: Layer[] }
+type AspectInput = {
+  overlay: string
+  background?: Background
+  slots: Slot[]
+  texts: TextBind[]
+  mood?: MoodPlacement
+  logo?: LogoPlacement
+  layers?: Layer[]
+}
+
+function buildAspect(input: AspectInput, aspect: Aspect, slots: Slot[]): AspectLayout {
+  const stickers = { mood: input.mood != null, logo: input.logo != null }
+  return {
+    overlay: input.overlay,
+    ...(input.background ? { background: input.background } : {}),
+    slots,
+    texts: input.texts.map(sanitizeText),
+    ...(input.mood ? { mood: sanitizeMood(input.mood, aspect) } : {}),
+    ...(input.logo ? { logo: { ...sanitizeMood(input.logo, aspect), style: input.logo.style } } : {}),
+    layers: sanitizeLayers(input.layers ?? [], slots, stickers),
+  }
+}
 
 export function buildManifest(input: {
   id: string
@@ -186,20 +253,8 @@ export function buildManifest(input: {
     names: input.names,
     premium: input.premium,
     photoCapacity,
-    story: {
-      overlay: input.story.overlay,
-      slots: storySlots,
-      texts: input.story.texts,
-      ...(input.story.mood ? { mood: sanitizeMood(input.story.mood, 'story') } : {}),
-      layers: sanitizeLayers(input.story.layers ?? [], storySlots, input.story.mood != null),
-    },
-    post: {
-      overlay: input.post.overlay,
-      slots: postSlots,
-      texts: input.post.texts,
-      ...(input.post.mood ? { mood: sanitizeMood(input.post.mood, 'post') } : {}),
-      layers: sanitizeLayers(input.post.layers ?? [], postSlots, input.post.mood != null),
-    },
+    story: buildAspect(input.story, 'story', storySlots),
+    post: buildAspect(input.post, 'post', postSlots),
   }
 }
 
