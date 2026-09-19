@@ -73,9 +73,9 @@ const RESIZE = new Set<string>(['nw', 'ne', 'sw', 'se'])
 const STICKERS: Sticker[] = ['mood', 'logo']
 const MAX_TILT = 45
 const MAX_CORNER = 24
-/** Safe-area insets as canvas fractions: 16dp at the sides; stories also keep the top / bottom 14% clear of the story UI chrome. */
+/** Safe-area insets as canvas fractions: 16dp at the sides; stories also keep the top / bottom 7% (45dp) clear of the story UI chrome. */
 const SAFE_INSET: Record<Aspect, { x: number; y: number }> = {
-  story: { x: 16 / 360, y: 0.14 },
+  story: { x: 16 / 360, y: 0.07 },
   post: { x: 16 / 360, y: 16 / 450 },
 }
 const SNAP_PX = 6
