@@ -216,6 +216,10 @@ import Logo from '../components/Logo.astro';
             <button class="is-active" type="button" data-mode="select">select</button>
             <button type="button" data-mode="draw">draw slot</button>
           </div>
+          <div class="aspect-toggle" aria-label="canvas helpers">
+            <button type="button" data-helper="grid" aria-pressed="false">grid</button>
+            <button type="button" data-helper="safe" aria-pressed="false">safe area</button>
+          </div>
           <p class="studio__zoom" title="⌘/Ctrl + · − · 0 or ⌘/Ctrl + wheel / pinch to zoom · ⌘/Ctrl Z undo · ⇧⌘/Ctrl Z redo">zoom <span data-zoom>100%</span></p>
         </div>
         <p class="studio__stage-hint" data-mode-hint>
@@ -231,9 +235,20 @@ import Logo from '../components/Logo.astro';
             <div class="frame__mood" data-stickers></div>
             <div class="frame__texts" data-texts></div>
             <div class="frame__rubber" data-rubber hidden></div>
+            <div class="frame__grid" aria-hidden="true"></div>
+            <div class="frame__safe" aria-hidden="true"></div>
+            <div class="frame__guide frame__guide--v" data-guide="v" hidden></div>
+            <div class="frame__guide frame__guide--h" data-guide="h" hidden></div>
           </div>
         </div>
       </section>
+    </div>
+
+    <div class="ctx" data-ctx role="menu" hidden>
+      <button type="button" role="menuitem" data-ctx-action="duplicate">duplicate <kbd>⌘D</kbd></button>
+      <button type="button" role="menuitem" data-ctx-action="up">bring forward</button>
+      <button type="button" role="menuitem" data-ctx-action="down">send backward</button>
+      <button type="button" role="menuitem" class="is-danger" data-ctx-action="delete">delete <kbd>⌫</kbd></button>
     </div>
 
     <div class="toasts" data-toasts aria-live="polite" aria-relevant="additions"></div>
@@ -369,6 +384,37 @@ import Logo from '../components/Logo.astro';
     border-color: var(--lg-error);
     background: color-mix(in srgb, var(--lg-error) 8%, var(--lg-background));
   }
+  .ctx {
+    position: fixed;
+    /* above the lifted selection (z 100) and the rubber band (z 200), which sort at the root since .stage makes no stacking context */
+    z-index: 300;
+    display: flex;
+    flex-direction: column;
+    min-width: 172px;
+    padding: 6px;
+    border-radius: 12px;
+    background: var(--lg-surface);
+    box-shadow: 0 14px 30px -14px rgba(74, 55, 40, .5), 0 0 0 1px color-mix(in srgb, var(--lg-secondary) 30%, transparent);
+  }
+  .ctx button {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    border: 0;
+    background: transparent;
+    padding: 8px 10px;
+    border-radius: 8px;
+    text-align: left;
+    font-family: var(--lg-font-display);
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--lg-on-background);
+    cursor: pointer;
+  }
+  .ctx button:hover, .ctx button:focus-visible { background: var(--lg-surface-dim); outline: none; }
+  .ctx button.is-danger { color: var(--lg-error); }
+  .ctx[hidden] { display: none; }
+  .ctx kbd { font: inherit; font-weight: 600; color: var(--lg-on-surface-subtle); }
   .toasts {
     position: fixed;
     left: 0;
@@ -513,6 +559,26 @@ import Logo from '../components/Logo.astro';
   }
   .frame:not(.has-overlay) .frame__empty { display: grid; }
   .frame__slots, .frame__mood, .frame__texts, .frame__rubber { position: absolute; inset: 0; pointer-events: none; }
+  /* Helpers sit above everything but never catch the pointer. Grid cells are 20dp on the 360dp design canvas. */
+  .frame__grid, .frame__safe, .frame__guide { position: absolute; pointer-events: none; z-index: 190; display: none; }
+  .frame__grid {
+    inset: 0;
+    --cell: calc(100cqw * 20 / 360);
+    background-image:
+      linear-gradient(to right, color-mix(in srgb, var(--lg-secondary) 35%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in srgb, var(--lg-secondary) 35%, transparent) 1px, transparent 1px);
+    background-size: var(--cell) var(--cell);
+  }
+  .frame__safe {
+    inset: var(--safe-y, 0) var(--safe-x, 0);
+    border: 1.5px dashed color-mix(in srgb, var(--lg-secondary) 75%, transparent);
+    box-shadow: 0 0 0 100vmax color-mix(in srgb, var(--lg-on-mood) 18%, transparent);
+    clip-path: inset(calc(-1 * var(--safe-y, 0)) calc(-1 * var(--safe-x, 0)));
+  }
+  .frame__guide { background: var(--lg-primary); }
+  .frame__guide--v { top: 0; bottom: 0; width: 1.5px; transform: translateX(-50%); }
+  .frame__guide--h { left: 0; right: 0; height: 1.5px; transform: translateY(-50%); }
+  .frame.show-grid .frame__grid, .frame.show-safe .frame__safe, .frame__guide:not([hidden]) { display: block; }
   .frame__rubber {
     z-index: 200;
     border: 1.5px dashed var(--lg-secondary);
@@ -524,12 +590,13 @@ import Logo from '../components/Logo.astro';
     border: 0;
     padding: 0;
     background: transparent;
-    cursor: grab;
+    cursor: pointer;
     touch-action: none;
     overflow: visible;
     pointer-events: auto;
   }
-  .slot.is-selected { cursor: grabbing; }
+  /* pointer to pick, grab once picked, grabbing while dragging (the frame carries that one during capture) */
+  .slot.is-selected, .mood-face.is-selected, .text-box.is-selected { cursor: grab; }
   .slot__fill {
     position: absolute;
     inset: 0;
@@ -635,7 +702,7 @@ import Logo from '../components/Logo.astro';
   .mood-face {
     position: absolute;
     aspect-ratio: 1;
-    cursor: grab;
+    cursor: pointer;
     touch-action: none;
     pointer-events: auto;
     color: var(--lg-on-mood);
@@ -644,7 +711,6 @@ import Logo from '../components/Logo.astro';
     box-shadow: inset 0 0 0 1.5px rgba(74, 55, 40, .35);
   }
   .mood-face.is-selected {
-    cursor: grabbing;
     box-shadow: inset 0 0 0 2.5px var(--lg-secondary);
   }
   .mood-face__art {
@@ -706,7 +772,7 @@ import Logo from '../components/Logo.astro';
   .mood-face__art--logo { padding: 14%; }
   .text-box {
     position: absolute;
-    cursor: grab;
+    cursor: pointer;
     touch-action: none;
     pointer-events: auto;
     line-height: 1.25;
@@ -716,7 +782,7 @@ import Logo from '../components/Logo.astro';
     outline-offset: 2px;
   }
   .text-box:hover { outline-color: rgba(74, 55, 40, .35); }
-  .text-box.is-selected { cursor: grabbing; outline-color: var(--lg-secondary); }
+  .text-box.is-selected { outline-color: var(--lg-secondary); }
   .text-box__body {
     display: -webkit-box;
     -webkit-box-orient: vertical;

@@ -73,6 +73,12 @@ const RESIZE = new Set<string>(['nw', 'ne', 'sw', 'se'])
 const STICKERS: Sticker[] = ['mood', 'logo']
 const MAX_TILT = 45
 const MAX_CORNER = 24
+/** Safe-area insets as canvas fractions: 16dp at the sides; stories also keep the top / bottom 14% clear of the story UI chrome. */
+const SAFE_INSET: Record<Aspect, { x: number; y: number }> = {
+  story: { x: 16 / 360, y: 0.14 },
+  post: { x: 16 / 360, y: 16 / 450 },
+}
+const SNAP_PX = 6
 const FRAME_WIDTH_DP = 360
 const ASPECT_HEIGHT_DP: Record<Aspect, number> = { story: 640, post: 450 }
 const MIN_STICKER_SIZE_DP = 16
@@ -201,6 +207,9 @@ export function mountStudio(root: HTMLElement): void {
   const stickerLayer = $('[data-stickers]', root)
   const textLayer = $('[data-texts]', root)
   const rubber = $('[data-rubber]', root)
+  const ctx = $('[data-ctx]')
+  const guideV = $('[data-guide="v"]', root)
+  const guideH = $('[data-guide="h"]', root)
   const list = $('[data-layer-list]', root)
   const inspector = $('[data-inspector]', root)
   const lockRatio = input('[data-slot-lock]', root)
@@ -412,6 +421,39 @@ export function mountStudio(root: HTMLElement): void {
       x: clamp01((event.clientX - box.left) / box.width),
       y: clamp01((event.clientY - box.top) / box.height),
     }
+  }
+
+  /**
+   * Smart guides for a move: snap the box's left / centre / right (and top / centre / bottom) to the canvas edges, centre,
+   * and safe-area lines when within SNAP_PX on screen, and light the matching guide line. Alt bypasses it.
+   */
+  function snapMove(box: { x: number; y: number; w: number; h: number }, event: PointerEvent): { x: number; y: number } {
+    const rect = frame.getBoundingClientRect()
+    const safe = SAFE_INSET[aspect]
+    const axis = (pos: number, size: number, inset: number, threshold: number): { pos: number; line: number | null } => {
+      const targets = [0, inset, 0.5, 1 - inset, 1]
+      const edges = [pos, pos + size / 2, pos + size]
+      let best: { pos: number; line: number | null; delta: number } = { pos, line: null, delta: threshold }
+      for (const target of targets) {
+        edges.forEach((edge, i) => {
+          const delta = Math.abs(edge - target)
+          if (delta < best.delta) best = { pos: target - (size * i) / 2, line: target, delta }
+        })
+      }
+      return best
+    }
+    const snapX = event.altKey ? { pos: box.x, line: null } : axis(box.x, box.w, safe.x, SNAP_PX / rect.width)
+    const snapY = event.altKey ? { pos: box.y, line: null } : axis(box.y, box.h, safe.y, SNAP_PX / rect.height)
+    guideV.hidden = snapX.line == null
+    guideH.hidden = snapY.line == null
+    if (snapX.line != null) guideV.style.left = `${snapX.line * 100}%`
+    if (snapY.line != null) guideH.style.top = `${snapY.line * 100}%`
+    return { x: snapX.pos, y: snapY.pos }
+  }
+
+  function hideGuides(): void {
+    guideV.hidden = true
+    guideH.hidden = true
   }
 
   function slotCenterPx(slot: DraftSlot): { x: number; y: number } {
@@ -799,6 +841,8 @@ export function mountStudio(root: HTMLElement): void {
       overlayImg.hidden = true
       overlayImg.removeAttribute('src')
     }
+    frame.style.setProperty('--safe-x', `${SAFE_INSET[aspect].x * 100}%`)
+    frame.style.setProperty('--safe-y', `${SAFE_INSET[aspect].y * 100}%`)
     $('[data-aspect-label]', root).textContent = aspect === 'story' ? '9:16 story' : '4:5 post'
     $('[data-overlay-empty]', root).textContent = url != null ? '' : `upload a ${aspect} overlay`
     input('[data-overlay-file]', root).value = ''
@@ -926,6 +970,36 @@ export function mountStudio(root: HTMLElement): void {
     renderSlots()
   }
 
+  /** Backspace, the context menu, and the layers panel all delete through here. */
+  function removeSelection(): void {
+    if (selection == null) return
+    if (selection === 'overlay') removeOverlay()
+    else if (selection === 'background') removeBackground()
+    else if (selection === 'mood' || selection === 'logo') removeSticker(selection)
+    else if (selectedText()) removeText(selection)
+    else removeSelected()
+  }
+
+  /** Only photo slots duplicate: stickers and the note are one-per-aspect. The copy lands 16dp down-right, one layer above the original. */
+  function duplicateSelected(): void {
+    const slot = selected()
+    if (!slot) return
+    const { slots, layers } = layout()
+    const copy: DraftSlot = {
+      ...slot,
+      id: uid(),
+      photo: slots.length,
+      x: clamp01(Math.min(slot.x + 16 / FRAME_WIDTH_DP, 1 - slot.w)),
+      y: clamp01(Math.min(slot.y + 16 / ASPECT_HEIGHT_DP[aspect], 1 - slot.h)),
+    }
+    slots.push(copy)
+    layers.splice(layers.indexOf(slot.id) + 1, 0, copy.id)
+    selection = copy.id
+    commit()
+    renderSlots()
+    setStatus(`photo ${copy.photo + 1} duplicated`)
+  }
+
   function applyResize(origin: Slot, handle: Handle, x: number, y: number): Slot {
     let left = origin.x
     let top = origin.y
@@ -1043,6 +1117,9 @@ export function mountStudio(root: HTMLElement): void {
       return
     }
     frame.setPointerCapture(event.pointerId)
+    // Capture routes the pointer to the frame, so the frame carries the grabbed element's cursor for the whole drag.
+    const cursor = getComputedStyle(target).cursor
+    frame.style.cursor = cursor === 'grab' || cursor === 'pointer' ? 'grabbing' : cursor
     event.preventDefault()
   })
 
@@ -1053,10 +1130,12 @@ export function mountStudio(root: HTMLElement): void {
     if (currentPointer.kind === 'move') {
       const slot = layout().slots.find((item) => item.id === currentPointer.id)
       if (!slot) return
-      slot.x = clamp01(currentPointer.originX + (x - currentPointer.startX))
-      slot.y = clamp01(currentPointer.originY + (y - currentPointer.startY))
-      slot.x = clamp01(Math.min(slot.x, 1 - slot.w))
-      slot.y = clamp01(Math.min(slot.y, 1 - slot.h))
+      const snapped = snapMove(
+        { x: currentPointer.originX + (x - currentPointer.startX), y: currentPointer.originY + (y - currentPointer.startY), w: slot.w, h: slot.h },
+        event,
+      )
+      slot.x = clamp01(Math.min(snapped.x, 1 - slot.w))
+      slot.y = clamp01(Math.min(snapped.y, 1 - slot.h))
       paintDragging()
     } else if (currentPointer.kind === 'resize') {
       const slot = layout().slots.find((item) => item.id === currentPointer.id)
@@ -1078,8 +1157,13 @@ export function mountStudio(root: HTMLElement): void {
     } else if (currentPointer.kind === 'sticker-move') {
       const sticker = layout()[currentPointer.which]
       if (!sticker) return
-      sticker.x = currentPointer.originX + (x - currentPointer.startX)
-      sticker.y = currentPointer.originY + (y - currentPointer.startY)
+      const size = stickerSizeFractions(sticker)
+      const snapped = snapMove(
+        { x: currentPointer.originX + (x - currentPointer.startX), y: currentPointer.originY + (y - currentPointer.startY), w: size.width, h: size.height },
+        event,
+      )
+      sticker.x = snapped.x
+      sticker.y = snapped.y
       clampStickerPosition(sticker)
       paintDragging()
     } else if (currentPointer.kind === 'sticker-resize') {
@@ -1105,8 +1189,12 @@ export function mountStudio(root: HTMLElement): void {
     } else if (currentPointer.kind === 'text-move') {
       const text = layout().texts.find((item) => item.id === currentPointer.id)
       if (!text) return
-      text.x = clamp01(Math.min(currentPointer.originX + (x - currentPointer.startX), 1 - text.w))
-      text.y = clamp01(currentPointer.originY + (y - currentPointer.startY))
+      const snapped = snapMove(
+        { x: currentPointer.originX + (x - currentPointer.startX), y: currentPointer.originY + (y - currentPointer.startY), w: text.w, h: 0 },
+        event,
+      )
+      text.x = clamp01(Math.min(snapped.x, 1 - text.w))
+      text.y = clamp01(snapped.y)
       paintDragging()
     } else if (currentPointer.kind === 'text-resize') {
       const text = layout().texts.find((item) => item.id === currentPointer.id)
@@ -1132,6 +1220,8 @@ export function mountStudio(root: HTMLElement): void {
   })
 
   function endPointer(): void {
+    hideGuides()
+    frame.style.cursor = mode === 'draw' ? 'crosshair' : 'default'
     if (pointer?.kind === 'draw') {
       const w = parseFloat(rubber.style.width) / 100
       const h = parseFloat(rubber.style.height) / 100
@@ -1226,6 +1316,15 @@ export function mountStudio(root: HTMLElement): void {
     button.addEventListener('click', () => {
       const next = button.dataset.mode
       if (next === 'select' || next === 'draw') setMode(next)
+    })
+  })
+
+  // Grid and safe-area overlays are view helpers only: session state, never part of the draft or the pack.
+  root.querySelectorAll<HTMLButtonElement>('[data-helper]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const on = button.classList.toggle('is-active')
+      button.setAttribute('aria-pressed', String(on))
+      frame.classList.toggle(`show-${button.dataset.helper}`, on)
     })
   })
 
@@ -1484,6 +1583,11 @@ export function mountStudio(root: HTMLElement): void {
         redo()
         return
       }
+      if (key === 'd') {
+        event.preventDefault()
+        duplicateSelected()
+        return
+      }
       return
     }
     if (event.key !== 'Backspace' && event.key !== 'Delete') return
@@ -1491,11 +1595,46 @@ export function mountStudio(root: HTMLElement): void {
     if (!root.contains(active) && selection == null) return
     if (selection == null) return
     event.preventDefault()
-    if (selection === 'overlay') removeOverlay()
-    else if (selection === 'background') removeBackground()
-    else if (selection === 'mood' || selection === 'logo') removeSticker(selection)
-    else if (selectedText()) removeText(selection)
-    else removeSelected()
+    removeSelection()
+  })
+
+  // Right-click on the canvas: select what is under the cursor and open the context menu there.
+  frame.addEventListener('contextmenu', (event) => {
+    const target = event.target
+    if (!(target instanceof HTMLElement) || mode === 'draw') return
+    event.preventDefault()
+    const slotEl = target.closest<HTMLElement>('[data-slot-id]')
+    const stickerEl = target.closest<HTMLElement>('[data-sticker]')
+    const textEl = target.closest<HTMLElement>('[data-text-id]')
+    selection =
+      slotEl?.dataset.slotId ?? stickerEl?.dataset.sticker ?? textEl?.dataset.textId ?? (overlays[aspect] ? 'overlay' : null)
+    if (selection == null) return
+    renderSlots()
+    const inLayers = layout().layers.includes(selection)
+    $('[data-ctx-action="duplicate"]', ctx).hidden = selected() == null
+    $('[data-ctx-action="up"]', ctx).hidden = !inLayers
+    $('[data-ctx-action="down"]', ctx).hidden = !inLayers
+    ctx.hidden = false
+    // Keep the menu on screen near the cursor.
+    const { width, height } = ctx.getBoundingClientRect()
+    ctx.style.left = `${Math.min(event.clientX, window.innerWidth - width - 8)}px`
+    ctx.style.top = `${Math.min(event.clientY, window.innerHeight - height - 8)}px`
+  })
+  ctx.addEventListener('click', (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLElement>('[data-ctx-action]')
+    ctx.hidden = true
+    if (!button || selection == null) return
+    const action = button.dataset.ctxAction
+    if (action === 'duplicate') duplicateSelected()
+    else if (action === 'up') moveLayer(selection, 1)
+    else if (action === 'down') moveLayer(selection, -1)
+    else if (action === 'delete') removeSelection()
+  })
+  document.addEventListener('pointerdown', (event) => {
+    if (!ctx.hidden && !ctx.contains(event.target as Node)) ctx.hidden = true
+  })
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') ctx.hidden = true
   })
 
   $('[data-export]', root).addEventListener('click', () => {
