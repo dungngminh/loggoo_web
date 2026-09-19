@@ -44,7 +44,7 @@ import Logo from '../components/Logo.astro';
           </div>
         </div>
 
-        <div class="tools" role="toolbar" aria-label="tools">
+        <div class="tools" role="toolbar" aria-label="tools" data-tour-tools>
           <button class="tool is-active" type="button" data-mode="select" title="select · click the frame, a slot, a sticker, or the note" aria-label="select">
             <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 3l11 7.5-4.8 1 2.6 4.6-2 1.1-2.6-4.6L6 16z" /></svg>
           </button>
@@ -74,6 +74,9 @@ import Logo from '../components/Logo.astro';
           <button class="tool tool--preview" type="button" data-preview aria-pressed="false" title="preview · render like the app, with placeholder photos" aria-label="preview">
             <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 4.5v11l9-5.5z" /></svg>
           </button>
+          <button class="tool" type="button" data-tour title="tutorial" aria-label="tutorial">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7" fill="none" /><path d="M8 8.2a2 2 0 1 1 2.8 1.8c-.6.3-.8.7-.8 1.3v.4" fill="none" /><circle cx="10" cy="14" r=".9" stroke="none" /></svg>
+          </button>
           <p class="topbar__zoom" title="⌘/Ctrl + · − · 0 or ⌘/Ctrl + wheel / pinch to zoom · ⌘/Ctrl Z undo · ⇧⌘/Ctrl Z redo"><span data-zoom>100%</span></p>
           <button class="btn btn--ghost btn--sm" type="button" data-reset>start over</button>
           <button class="btn btn--primary btn--sm" type="button" data-export>export zip</button>
@@ -83,13 +86,13 @@ import Logo from '../components/Logo.astro';
       <aside class="panel panel--left">
         <section class="panel__section">
           <h2 class="panel__title">pages</h2>
-          <div class="pages" role="tablist" aria-label="frame aspect">
+          <div class="pages" role="tablist" aria-label="frame aspect" data-tour-pages>
             <button class="page is-active" type="button" data-aspect="story"><span class="page__dot"></span>story · 9:16</button>
             <button class="page" type="button" data-aspect="post"><span class="page__dot"></span>post · 4:5</button>
           </div>
         </section>
 
-        <section class="panel__section">
+        <section class="panel__section" data-tour-pack>
           <h2 class="panel__title">pack</h2>
           <div class="panel__body">
           <label class="field">
@@ -117,7 +120,7 @@ import Logo from '../components/Logo.astro';
           <p class="panel__hint" data-icon-status></p>
           </div>
         </section>
-        <section class="panel__section panel__section--grow">
+        <section class="panel__section panel__section--grow" data-tour-layers>
           <h2 class="panel__title">layers</h2>
           <p class="panel__hint">top first · drag or ▲ ▼ to reorder · note pinned above, background below</p>
           <div class="layer-list" data-layer-list></div>
@@ -279,9 +282,27 @@ import Logo from '../components/Logo.astro';
 
     <div class="toasts" data-toasts aria-live="polite" aria-relevant="additions"></div>
 
+    <div class="tour" data-tour-root hidden>
+      <div class="tour__spot" aria-hidden="true"></div>
+      <div class="tour__card" role="dialog" aria-labelledby="tour-title" aria-describedby="tour-body">
+        <p class="tour__count" data-tour-count></p>
+        <h2 class="tour__title" id="tour-title" data-tour-title></h2>
+        <p class="tour__body" id="tour-body" data-tour-body></p>
+        <div class="tour__actions">
+          <button class="btn btn--ghost btn--xs" type="button" data-tour-skip>skip</button>
+          <span class="tour__spacer"></span>
+          <button class="btn btn--ghost btn--xs" type="button" data-tour-back>back</button>
+          <button class="btn btn--primary btn--xs" type="button" data-tour-next>next</button>
+        </div>
+      </div>
+    </div>
+
     <script>
       import { mountStudio } from '../scripts/frame-studio'
-      mountStudio(document.getElementById('studio')!)
+      import { mountTour } from '../scripts/studio-tour'
+      const studio = document.getElementById('studio')!
+      mountStudio(studio)
+      mountTour(studio, document.querySelector('[data-tour-root]')!)
     </script>
   </body>
 </html>
@@ -662,6 +683,36 @@ import Logo from '../components/Logo.astro';
   /* the menu sits outside #studio, so it needs its own [hidden] override for the display: flex items */
   .ctx[hidden], .ctx [hidden] { display: none !important; }
   .ctx kbd { font: inherit; font-weight: 600; color: var(--lg-on-surface-subtle); }
+  /* Coach marks: the spot's giant box-shadow dims everything but the target; the card sits next to it. */
+  .tour { position: fixed; inset: 0; z-index: 400; }
+  .tour[hidden] { display: none; }
+  /* no target (welcome): dim the whole page and hide the spot */
+  .tour:has(.tour__spot[hidden]) { background: rgba(33, 25, 21, .55); }
+  .tour__spot[hidden] { display: none; }
+  .tour__spot {
+    position: fixed;
+    border-radius: 12px;
+    box-shadow: 0 0 0 100vmax rgba(33, 25, 21, .55), 0 0 0 2px var(--lg-primary);
+    transition: left .2s ease, top .2s ease, width .2s ease, height .2s ease;
+  }
+  .tour__card {
+    position: fixed;
+    width: min(320px, calc(100vw - 16px));
+    padding: 14px 16px;
+    border-radius: 14px;
+    background: var(--lg-surface);
+    box-shadow: 0 18px 40px -18px rgba(74, 55, 40, .6);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .tour__count { margin: 0; font-size: 11px; font-weight: 700; color: var(--lg-on-surface-muted); }
+  .tour__title { margin: 0; font-family: var(--lg-font-display); font-size: 15px; font-weight: 700; }
+  .tour__body { margin: 0; font-size: 13px; line-height: 1.45; color: var(--lg-on-surface-variant); }
+  .tour__actions { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+  .tour__spacer { flex: 1; }
+  .tour__actions .btn--xs { align-self: auto; }
+  @media (prefers-reduced-motion: reduce) { .tour__spot { transition: none; } }
   .toasts {
     position: fixed; left: 0; right: 0; bottom: 22px; z-index: 90;
     display: flex; flex-direction: column; align-items: center; gap: 10px;
