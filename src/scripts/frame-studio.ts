@@ -250,6 +250,13 @@ export function mountStudio(root: HTMLElement): void {
 
   let aspect: Aspect = 'story'
   let mode: Mode = 'select'
+  /** Resize-snap toggle: moving always snaps; with this off, resizing only lights the guides and leaves the edge alone. Remembered per browser. */
+  let snapping = true
+  try {
+    snapping = localStorage.getItem('loggoo-studio-snap') !== '0'
+  } catch {
+    /* private mode: default on */
+  }
   /** A slot id, a text id, 'mood', 'logo', 'overlay', 'background', or nothing. */
   let selection: string | null = null
   let pointer: PointerMode | null = null
@@ -503,6 +510,27 @@ export function mountStudio(root: HTMLElement): void {
     if (snapX.line != null) guideV.style.left = `${snapX.line * 100}%`
     if (snapY.line != null) guideH.style.top = `${snapY.line * 100}%`
     return { x: snapX.pos, y: snapY.pos }
+  }
+
+  /** Snap a dragged edge (resize handles) to the same canvas / centre / safe-area lines, lighting the guide on the snapped axis. */
+  function snapEdge(x: number, y: number, event: PointerEvent, useX: boolean, useY: boolean): { x: number; y: number } {
+    const rect = frame.getBoundingClientRect()
+    const safe = SAFE_INSET[aspect]
+    const pick = (value: number, inset: number, threshold: number): { pos: number; line: number | null } => {
+      let best: { pos: number; line: number | null; delta: number } = { pos: value, line: null, delta: threshold }
+      for (const target of [0, inset, 0.5, 1 - inset, 1]) {
+        const delta = Math.abs(value - target)
+        if (delta < best.delta) best = { pos: target, line: target, delta }
+      }
+      return best
+    }
+    const snapX = useX && !event.altKey ? pick(x, safe.x, SNAP_PX / rect.width) : { pos: x, line: null }
+    const snapY = useY && !event.altKey ? pick(y, safe.y, SNAP_PX / rect.height) : { pos: y, line: null }
+    guideV.hidden = snapX.line == null
+    guideH.hidden = snapY.line == null
+    if (snapX.line != null) guideV.style.left = `${snapX.line * 100}%`
+    if (snapY.line != null) guideH.style.top = `${snapY.line * 100}%`
+    return snapping ? { x: snapX.pos, y: snapY.pos } : { x, y }
   }
 
   function hideGuides(): void {
@@ -1217,7 +1245,8 @@ export function mountStudio(root: HTMLElement): void {
     } else if (currentPointer.kind === 'resize') {
       const slot = layout().slots.find((item) => item.id === currentPointer.id)
       if (!slot) return
-      Object.assign(slot, applyResize(currentPointer.origin, currentPointer.handle, x, y))
+      const edge = snapEdge(x, y, event, /[we]/.test(currentPointer.handle), /[ns]/.test(currentPointer.handle))
+      Object.assign(slot, applyResize(currentPointer.origin, currentPointer.handle, edge.x, edge.y))
       paintDragging()
     } else if (currentPointer.kind === 'rotate') {
       const slot = layout().slots.find((item) => item.id === currentPointer.id)
@@ -1246,8 +1275,9 @@ export function mountStudio(root: HTMLElement): void {
     } else if (currentPointer.kind === 'sticker-resize') {
       const sticker = layout()[currentPointer.which]
       if (!sticker) return
-      const sizeFromX = (x - sticker.x) * FRAME_WIDTH_DP
-      const sizeFromY = (y - sticker.y) * ASPECT_HEIGHT_DP[aspect]
+      const edge = snapEdge(x, y, event, true, true)
+      const sizeFromX = (edge.x - sticker.x) * FRAME_WIDTH_DP
+      const sizeFromY = (edge.y - sticker.y) * ASPECT_HEIGHT_DP[aspect]
       const maximum = Math.min(
         MAX_STICKER_SIZE_DP,
         (1 - sticker.x) * FRAME_WIDTH_DP,
@@ -1276,7 +1306,7 @@ export function mountStudio(root: HTMLElement): void {
     } else if (currentPointer.kind === 'text-resize') {
       const text = layout().texts.find((item) => item.id === currentPointer.id)
       if (!text) return
-      text.w = clamp(x - text.x, MIN_TEXT_W, 1 - text.x)
+      text.w = clamp(snapEdge(x, y, event, true, false).x - text.x, MIN_TEXT_W, 1 - text.x)
       paintDragging()
     } else if (currentPointer.kind === 'text-rotate') {
       const text = layout().texts.find((item) => item.id === currentPointer.id)
@@ -1499,6 +1529,23 @@ export function mountStudio(root: HTMLElement): void {
       setStatus('back to editing')
       toast('info', 'edit mode')
     }
+  })
+
+  const snapButton = $('[data-snap]', root) as HTMLButtonElement
+  function paintSnap(): void {
+    snapButton.classList.toggle('is-active', snapping)
+    snapButton.setAttribute('aria-pressed', String(snapping))
+  }
+  paintSnap()
+  snapButton.addEventListener('click', () => {
+    snapping = !snapping
+    paintSnap()
+    try {
+      localStorage.setItem('loggoo-studio-snap', snapping ? '1' : '0')
+    } catch {
+      /* fine, session only */
+    }
+    toast('info', snapping ? 'resize snap on · edges hit the guide lines' : 'resize snap off · guides only show while resizing')
   })
 
   $('[data-add-slot]', root).addEventListener('click', addSlot)
